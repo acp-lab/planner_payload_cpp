@@ -1,0 +1,558 @@
+#include <algorithm>
+#include <cmath>
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <planner_payload_cpp/nmpc_planner.h>
+#include <quadrotor_msgs/msg/position_command.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+
+namespace planner_payload_nodelet {
+class NMPCControlNodelet : public rclcpp::Node {
+public:
+  NMPCControlNodelet(const rclcpp::NodeOptions &options)
+      : Node("nmpc_control_nodelet", options), frame_id_("world"),
+        enable_motors_(false), _optimization_error(false), _aux_initial(false),
+        set_pre_odom_quat_(false) {
+
+    this->declare_parameter("mass", 0.11);
+    this->declare_parameter("gravity", 9.81);
+    this->declare_parameter("length", 0.88);
+
+    logParameter("mass", mass_, "%.4f");
+    logParameter("gravity", gravity_, "%.4f");
+    logParameter("length", length_, "%.4f");
+
+    inertia_matrix_ = Eigen::Matrix3d::Zero();
+
+    this->declare_parameter("ixx", 0.0);
+    this->declare_parameter("iyy", 0.0);
+    this->declare_parameter("izz", 0.0);
+
+    logParameter("ixx", inertia_matrix_(0, 0), "%.4f");
+    logParameter("iyy", inertia_matrix_(1, 1), "%.4f");
+    logParameter("izz", inertia_matrix_(2, 2), "%.4f");
+
+    this->declare_parameter("platform_type", "");
+    logParameter("platform_type", platform_type_, "%s");
+
+    this->declare_parameter<std::vector<double>>(
+        "nmpc.Q", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5., 5.,
+                                      1., 1., 1.});
+    this->declare_parameter<std::vector<double>>(
+        "nmpc.Q_e", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
+                                        5., 1., 1., 1.});
+    this->declare_parameter<std::vector<double>>(
+        "nmpc.R", std::vector<double>{0.5, 0.1, 0.1, 0.1});
+
+    rclcpp::Parameter Q_param = this->get_parameter("nmpc.Q");
+    rclcpp::Parameter Q_e_param = this->get_parameter("nmpc.Q_e");
+    rclcpp::Parameter R_param = this->get_parameter("nmpc.R");
+
+    RCLCPP_INFO(this->get_logger(), "[NMPC] Q: %s",
+                Q_param.value_to_string().c_str());
+    RCLCPP_INFO(this->get_logger(), "[NMPC] Q_e: %s",
+                Q_e_param.value_to_string().c_str());
+    RCLCPP_INFO(this->get_logger(), "[NMPC] R: %s",
+                R_param.value_to_string().c_str());
+
+    Q_param_ = Q_param.as_double_array();
+    Q_e_param_ = Q_e_param.as_double_array();
+    R_param_ = R_param.as_double_array();
+
+    clock_ = rclcpp::Clock();
+
+    controller_.setMass(mass_);
+    controller_.setGravity(gravity_);
+    controller_.setWeightMatrices(Q_param_, Q_e_param_, R_param_);
+
+    // custom QoS
+    auto qos_profile = rclcpp::SensorDataQoS();
+
+    // Publish payload desired and predictions
+    pub_ref_traj_ =
+        this->create_publisher<nav_msgs::msg::Path>("reference_path", 1);
+
+    pub_pred_traj_ =
+        this->create_publisher<nav_msgs::msg::Path>("predicted_path", 1);
+
+    // Publish quadrotor desired
+    pub_desired_quadrotor_ =
+        this->create_publisher<quadrotor_msgs::msg::PositionCommand>(
+            "quadrotor/payload_planner_quadrotor_cmd", 1);
+
+    // Subscribers
+    sub_payload_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "quadrotor/payload/odom", qos_profile,
+        std::bind(&NMPCControlNodelet::payloadOdomCallback, this,
+                  std::placeholders::_1));
+    sub_quad_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "quadrotor/odom", qos_profile,
+        std::bind(&NMPCControlNodelet::quadOdomCallback, this,
+                  std::placeholders::_1));
+    sub_position_cmd_ =
+        this->create_subscription<quadrotor_msgs::msg::PositionCommand>(
+            "quadrotor/position_cmd", 1,
+            std::bind(&NMPCControlNodelet::referenceCallback, this,
+                      std::placeholders::_1));
+
+    srv_activate_payload_ = this->create_service<std_srvs::srv::SetBool>(
+        "quadrotor/activate_payload_nmpc_controller",
+        std::bind(&NMPCControlNodelet::activate_payload_callback, this,
+                  std::placeholders::_1, std::placeholders::_2));
+  }
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+private:
+  template <typename T>
+  void logParameter(const std::string &param_name, T &param_value,
+                    const std::string &format) {
+    if (!this->get_parameter(param_name, param_value)) {
+      RCLCPP_ERROR(this->get_logger(), "[NMPC] No %s!", param_name.c_str());
+    } else {
+      if constexpr (std::is_same_v<T, std::string>) {
+        RCLCPP_INFO(this->get_logger(), "[NMPC] %s: %s", param_name.c_str(),
+                    param_value.c_str());
+      } else {
+        RCLCPP_INFO(this->get_logger(),
+                    ("[NMPC] " + param_name + ": " + format).c_str(),
+                    param_value);
+      }
+    }
+  }
+
+  NMPCControl controller_;
+  rclcpp::Clock clock_;
+
+  // from odom callback
+  std::string frame_id_;
+  Eigen::Vector4d pre_odom_quat_;
+  bool enable_motors_;
+  bool _optimization_error;
+  bool _aux_initial;
+  bool set_pre_odom_quat_;
+
+  // from param server
+  double mass_;
+  double gravity_;
+  double length_;
+
+  Eigen::Matrix4d mixer_matrix_inv_;
+  Eigen::Matrix3d inertia_matrix_;
+
+  std::string platform_type_;
+  std::vector<double> Q_param_;
+  std::vector<double> Q_e_param_;
+  std::vector<double> R_param_;
+
+  Eigen::Vector3d quad_position_{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d quad_velocity_{Eigen::Vector3d::Zero()};
+  bool has_quad_odom_{false};
+  bool has_reference_{false};
+  bool use_nmpc_payload_{false};
+
+  void payloadOdomCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
+  void quadOdomCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
+  void referenceCallback(
+      const quadrotor_msgs::msg::PositionCommand::SharedPtr pos_cmd);
+  void run();
+  void publishPrediction();
+  void publishReference();
+  void publishDesiredQuadrotorCommand();
+  Eigen::Vector3d quadrotorPositionFromPayloadState(
+      const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state)
+      const;
+  Eigen::Vector3d quadrotorVelocityFromPayloadState(
+      const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state)
+      const;
+  Eigen::Vector3d quadrotorAccelerationFromPayloadStateInput(
+      const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state,
+      const Eigen::Ref<const Eigen::Matrix<double, kInputSize, 1>> &input)
+      const;
+
+  void activate_payload_callback(
+      const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+      std::shared_ptr<std_srvs::srv::SetBool::Response> response);
+
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_ref_traj_;
+
+  rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_pred_traj_;
+
+  rclcpp::Publisher<quadrotor_msgs::msg::PositionCommand>::SharedPtr
+      pub_desired_quadrotor_;
+
+  // rclcpp::Publisher<mujoco_msgs::msg::Dual>::SharedPtr pub_dual_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr
+      sub_payload_odometry_;
+
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr sub_quad_odometry_;
+
+  rclcpp::Subscription<quadrotor_msgs::msg::PositionCommand>::SharedPtr
+      sub_position_cmd_;
+
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr srv_activate_payload_;
+};
+void NMPCControlNodelet::quadOdomCallback(
+    const nav_msgs::msg::Odometry::SharedPtr odom_msg) {
+  quad_position_ << odom_msg->pose.pose.position.x,
+      odom_msg->pose.pose.position.y, odom_msg->pose.pose.position.z;
+  quad_velocity_ << odom_msg->twist.twist.linear.x,
+      odom_msg->twist.twist.linear.y, odom_msg->twist.twist.linear.z;
+  has_quad_odom_ = true;
+}
+
+void NMPCControlNodelet::activate_payload_callback(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
+  use_nmpc_payload_ = request->data;
+  response->success = true;
+  response->message =
+      use_nmpc_payload_ ? "Payload NMPC active" : "Standard TRPY active";
+  RCLCPP_INFO(this->get_logger(), "Switching controller mode: %s",
+              response->message.c_str());
+}
+
+void NMPCControlNodelet::payloadOdomCallback(
+    const nav_msgs::msg::Odometry::SharedPtr odom_msg) {
+  Eigen::Matrix<double, 12, 1> state(Eigen::Matrix<double, 12, 1>::Zero());
+
+  frame_id_ = odom_msg->header.frame_id;
+  state(0) = odom_msg->pose.pose.position.x;
+  state(1) = odom_msg->pose.pose.position.y;
+  state(2) = odom_msg->pose.pose.position.z;
+
+  state(3) = odom_msg->twist.twist.linear.x;
+  state(4) = odom_msg->twist.twist.linear.y;
+  state(5) = odom_msg->twist.twist.linear.z;
+
+  Eigen::Vector3d cable_dir(0.0, 0.0, -1.0);
+  Eigen::Vector3d cable_r(0.0, 0.0, 0.0);
+  if (has_quad_odom_) {
+    const Eigen::Vector3d payload_position = state.segment<3>(0);
+    const Eigen::Vector3d payload_velocity = state.segment<3>(3);
+    const Eigen::Vector3d a = payload_position - quad_position_;
+    const Eigen::Vector3d a_dot = payload_velocity - quad_velocity_;
+    const double norm_a = a.norm();
+    const double dot_a = a.dot(a);
+    const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+    const Eigen::Matrix3d projection = I - (a * a.transpose()) / dot_a;
+    const Eigen::Vector3d n_dot = (1.0 / norm_a) * projection * a_dot;
+
+    cable_dir = a / norm_a;
+    cable_r = cable_dir.cross(n_dot);
+  } else {
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                         "[NMPC] Waiting for quadrotor odometry; using default "
+                         "cable direction.");
+  }
+
+  state.segment<3>(6) = cable_dir;
+  state.segment<3>(9) = cable_r;
+
+  const double stamp_sec =
+      static_cast<double>(odom_msg->header.stamp.sec) +
+      static_cast<double>(odom_msg->header.stamp.nanosec) * 1e-9;
+  controller_.setState(state, stamp_sec);
+}
+
+void NMPCControlNodelet::referenceCallback(
+    const quadrotor_msgs::msg::PositionCommand::SharedPtr reference_msg) {
+  Eigen::Matrix<double, kStateSize, kSamples> reference_states =
+      Eigen::Matrix<double, kStateSize, kSamples>::Zero();
+  Eigen::Matrix<double, kInputSize, kSamples> reference_inputs =
+      Eigen::Matrix<double, kInputSize, kSamples>::Zero();
+
+  const Eigen::Vector3d n_eq(0.0, 0.0, -1.0);
+  const Eigen::Vector3d r_eq(0.0, 0.0, 0.0);
+  const double thrust_eq = mass_ * gravity_;
+
+  const size_t n_points = reference_msg->points.size();
+
+  int number_iterations = n_points;
+
+  if (n_points == 0) {
+    for (int i = 0; i < kSamples; ++i) {
+      reference_states(0, i) = reference_msg->position.x;
+      reference_states(1, i) = reference_msg->position.y;
+      reference_states(2, i) = reference_msg->position.z;
+      reference_states(3, i) = reference_msg->velocity.x;
+      reference_states(4, i) = reference_msg->velocity.y;
+      reference_states(5, i) = reference_msg->velocity.z;
+      reference_states.block<3, 1>(6, i) = n_eq;
+      reference_states.block<3, 1>(9, i) = r_eq;
+
+      reference_inputs(0, i) = thrust_eq;
+      reference_inputs(1, i) = 0.0;
+      reference_inputs(2, i) = 0.0;
+      reference_inputs(3, i) = 0.0;
+    }
+  } else {
+    for (int i = 0; i < kSamples; ++i) {
+      const size_t idx = std::min(static_cast<size_t>(i), n_points - 1U);
+      const auto &point = reference_msg->points[idx];
+
+      reference_states(0, i) = point.position.x;
+      reference_states(1, i) = point.position.y;
+      reference_states(2, i) = point.position.z;
+      reference_states(3, i) = point.velocity.x;
+      reference_states(4, i) = point.velocity.y;
+      reference_states(5, i) = point.velocity.z;
+
+      reference_states(6, i) = point.cable_direction.x;
+      reference_states(7, i) = point.cable_direction.y;
+      reference_states(8, i) = point.cable_direction.z;
+      reference_states.block<3, 1>(9, i) = r_eq;
+
+      reference_inputs(0, i) = point.tension;
+      reference_inputs(1, i) = 0.0;
+      reference_inputs(2, i) = 0.0;
+      reference_inputs(3, i) = 0.0;
+    }
+  }
+
+  RCLCPP_WARN_THROTTLE(this->get_logger(), clock_, 1000,
+                       "[PayloadOlanner] Checking length desired path. %i",
+                       number_iterations);
+  controller_.setReferenceStates(reference_states);
+  controller_.setReferenceInputs(reference_inputs);
+  has_reference_ = true;
+  if (use_nmpc_payload_) {
+    run();
+  } else {
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                         "[NMPC] Waiting to switch to payload planner "
+                         "(/quadrotor/activate_payload_nmpc_controller).");
+  }
+}
+
+void NMPCControlNodelet::run() {
+  const int acados_status = controller_.run();
+
+  switch (acados_status) {
+  case 1:
+    if (_aux_initial) {
+      RCLCPP_WARN(this->get_logger(),
+                  "[NMPC] acados failure: could not find a solution.");
+      _optimization_error = true;
+      return;
+    }
+    break;
+  case 2:
+    RCLCPP_WARN(this->get_logger(),
+                "[NMPC] acados maxiter: maximum iterations reached.");
+    _optimization_error = true;
+    return;
+  case 3:
+    RCLCPP_WARN(this->get_logger(),
+                "[NMPC] acados minstep: minimum QP step reached.");
+    _optimization_error = true;
+    return;
+  case 4:
+    RCLCPP_WARN(this->get_logger(), "[NMPC] acados qp failure.");
+    _optimization_error = true;
+    return;
+  default:
+    break;
+  }
+
+  const Eigen::Matrix<double, kStateSize, 1> pred_state =
+      controller_.getPredictedState();
+  const Eigen::Matrix<double, kInputSize, 1> pred_input =
+      controller_.getPredictedInput();
+
+  if (!pred_state.allFinite() || !pred_input.allFinite()) {
+    RCLCPP_WARN(this->get_logger(), "[NMPC] NaN/Inf in current solution.");
+    _optimization_error = true;
+    _aux_initial = true;
+    return;
+  }
+
+  _optimization_error = false;
+  _aux_initial = false;
+  publishPrediction();
+  publishReference();
+  publishDesiredQuadrotorCommand();
+}
+
+void NMPCControlNodelet::publishPrediction() {
+  const auto predicted_states = controller_.getPredictedStates();
+
+  nav_msgs::msg::Path path_msg;
+  path_msg.header.stamp = this->now();
+  path_msg.header.frame_id = frame_id_;
+  path_msg.poses.reserve(kSamples);
+
+  for (int i = 0; i < kSamples; ++i) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header = path_msg.header;
+    pose.pose.position.x = predicted_states(0, i);
+    pose.pose.position.y = predicted_states(1, i);
+    pose.pose.position.z = predicted_states(2, i);
+    pose.pose.orientation.w = 1.0;
+    path_msg.poses.push_back(pose);
+  }
+
+  pub_pred_traj_->publish(path_msg);
+}
+
+void NMPCControlNodelet::publishReference() {
+  const auto reference_states = controller_.getReferenceStates();
+
+  nav_msgs::msg::Path path_msg;
+  path_msg.header.stamp = this->now();
+  path_msg.header.frame_id = frame_id_;
+  path_msg.poses.reserve(kSamples);
+
+  for (int i = 0; i < kSamples; ++i) {
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header = path_msg.header;
+    pose.pose.position.x = reference_states(0, i);
+    pose.pose.position.y = reference_states(1, i);
+    pose.pose.position.z = reference_states(2, i);
+    pose.pose.orientation.w = 1.0;
+    path_msg.poses.push_back(pose);
+  }
+  pub_ref_traj_->publish(path_msg);
+}
+
+void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
+  const auto predicted_states = controller_.getPredictedStates();
+  const auto predicted_inputs = controller_.getPredictedInputs();
+
+  quadrotor_msgs::msg::PositionCommand position_cmd_msg;
+  position_cmd_msg.header.stamp = this->now();
+  position_cmd_msg.header.frame_id = frame_id_;
+  position_cmd_msg.planner_type =
+      quadrotor_msgs::msg::PositionCommand::PAYLOAD_PLANNER;
+  position_cmd_msg.yaw = 0.0;
+  position_cmd_msg.yaw_dot = 0.0;
+
+  const int first_state_idx = std::min(1, kSamples - 1);
+  const int first_input_idx = 0;
+  const Eigen::Vector3d quad_pos =
+      quadrotorPositionFromPayloadState(predicted_states.col(first_state_idx));
+  const Eigen::Vector3d quad_vel =
+      quadrotorVelocityFromPayloadState(predicted_states.col(first_state_idx));
+  const Eigen::Vector3d quad_acc = quadrotorAccelerationFromPayloadStateInput(
+      predicted_states.col(first_state_idx),
+      predicted_inputs.col(first_input_idx));
+  const double tension = predicted_inputs(0, first_input_idx);
+  const Eigen::Vector3d direction =
+      predicted_states.col(first_state_idx).segment<3>(6);
+  const Eigen::Vector3d cable_force = tension * direction;
+
+  position_cmd_msg.position.x = quad_pos(0);
+  position_cmd_msg.position.y = quad_pos(1);
+  position_cmd_msg.position.z = quad_pos(2);
+  position_cmd_msg.velocity.x = quad_vel(0);
+  position_cmd_msg.velocity.y = quad_vel(1);
+  position_cmd_msg.velocity.z = quad_vel(2);
+  position_cmd_msg.acceleration.x = quad_acc(0);
+  position_cmd_msg.acceleration.y = quad_acc(1);
+  position_cmd_msg.acceleration.z = quad_acc(2);
+  position_cmd_msg.cable_force.x = cable_force(0);
+  position_cmd_msg.cable_force.y = cable_force(1);
+  position_cmd_msg.cable_force.z = cable_force(2);
+
+  position_cmd_msg.points.reserve(kSamples);
+  for (int i = 0; i < kSamples; ++i) {
+    const int state_idx = std::min(i + 1, kSamples - 1);
+    const int input_idx = std::min(i, kSamples - 1);
+    const auto state_i = predicted_states.col(state_idx);
+    const auto input_i = predicted_inputs.col(input_idx);
+
+    const Eigen::Vector3d payload_position = state_i.segment<3>(0);
+    const Eigen::Vector3d payload_velocity = state_i.segment<3>(3);
+    const Eigen::Vector3d cable_direction = state_i.segment<3>(6);
+    const Eigen::Vector3d cable_angular_velocity = state_i.segment<3>(9);
+
+    const Eigen::Vector3d quad_position =
+        quadrotorPositionFromPayloadState(state_i);
+    const Eigen::Vector3d quad_velocity =
+        quadrotorVelocityFromPayloadState(state_i);
+    const Eigen::Vector3d quad_acceleration =
+        quadrotorAccelerationFromPayloadStateInput(state_i, input_i);
+
+    const double thrust_i = input_i(0);
+    const double safe_mass = std::max(std::abs(mass_), 1e-6);
+    const Eigen::Vector3d e3(0.0, 0.0, 1.0);
+    const Eigen::Vector3d payload_acceleration =
+        -(thrust_i / safe_mass) * cable_direction - gravity_ * e3;
+
+    quadrotor_msgs::msg::TrajectoryPoint point;
+    point.position.x = payload_position(0);
+    point.position.y = payload_position(1);
+    point.position.z = payload_position(2);
+    point.velocity.x = payload_velocity(0);
+    point.velocity.y = payload_velocity(1);
+    point.velocity.z = payload_velocity(2);
+    point.acceleration.x = payload_acceleration(0);
+    point.acceleration.y = payload_acceleration(1);
+    point.acceleration.z = payload_acceleration(2);
+    point.quaternion.w = 1.0;
+    point.quaternion.x = 0.0;
+    point.quaternion.y = 0.0;
+    point.quaternion.z = 0.0;
+    point.angular_velocity.x = cable_angular_velocity(0);
+    point.angular_velocity.y = cable_angular_velocity(1);
+    point.angular_velocity.z = cable_angular_velocity(2);
+    point.force = thrust_i;
+    point.position_quad.x = quad_position(0);
+    point.position_quad.y = quad_position(1);
+    point.position_quad.z = quad_position(2);
+    point.velocity_quad.x = quad_velocity(0);
+    point.velocity_quad.y = quad_velocity(1);
+    point.velocity_quad.z = quad_velocity(2);
+    point.acceleration_quad.x = quad_acceleration(0);
+    point.acceleration_quad.y = quad_acceleration(1);
+    point.acceleration_quad.z = quad_acceleration(2);
+    position_cmd_msg.points.push_back(point);
+  }
+
+  pub_desired_quadrotor_->publish(position_cmd_msg);
+}
+
+Eigen::Vector3d NMPCControlNodelet::quadrotorPositionFromPayloadState(
+    const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state) const {
+  const Eigen::Vector3d payload_position = state.segment<3>(0);
+  const Eigen::Vector3d cable_direction = state.segment<3>(6);
+  return payload_position - (length_ * cable_direction);
+}
+
+Eigen::Vector3d NMPCControlNodelet::quadrotorVelocityFromPayloadState(
+    const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state) const {
+  const Eigen::Vector3d payload_velocity = state.segment<3>(3);
+  const Eigen::Vector3d cable_direction = state.segment<3>(6);
+  const Eigen::Vector3d cable_angular_velocity = state.segment<3>(9);
+  return payload_velocity -
+         length_ * cable_angular_velocity.cross(cable_direction);
+}
+
+Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadStateInput(
+    const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state,
+    const Eigen::Ref<const Eigen::Matrix<double, kInputSize, 1>> &input) const {
+  const Eigen::Vector3d cable_direction = state.segment<3>(6);
+  const Eigen::Vector3d cable_angular_velocity = state.segment<3>(9);
+  const double thrust_command = input(0);
+  const Eigen::Vector3d cable_angular_acceleration_input = input.segment<3>(1);
+
+  const double safe_mass = std::max(std::abs(mass_), 1e-6);
+  const Eigen::Vector3d e3(0.0, 0.0, 1.0);
+  const Eigen::Vector3d payload_linear_acceleration =
+      -(thrust_command / safe_mass) * cable_direction - gravity_ * e3;
+  const Eigen::Vector3d input_angular_acc_cable =
+      -length_ * cable_angular_acceleration_input.cross(cable_direction);
+  const Eigen::Vector3d cable_angular_velocity_aux =
+      cable_angular_velocity.cross(cable_direction);
+  const Eigen::Vector3d angular_velocity_cable =
+      -length_ * cable_angular_velocity.cross(cable_angular_velocity_aux);
+  return payload_linear_acceleration + input_angular_acc_cable +
+         angular_velocity_cable;
+}
+
+} // namespace planner_payload_nodelet
+
+RCLCPP_COMPONENTS_REGISTER_NODE(planner_payload_nodelet::NMPCControlNodelet)
