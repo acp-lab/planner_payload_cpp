@@ -73,11 +73,11 @@ public:
     auto qos_profile = rclcpp::SensorDataQoS();
 
     // Publish payload desired and predictions
-    pub_ref_traj_ =
-        this->create_publisher<nav_msgs::msg::Path>("reference_path", 1);
+    pub_ref_traj_ = this->create_publisher<nav_msgs::msg::Path>(
+        "quadrotor/payload_reference_path", 1);
 
-    pub_pred_traj_ =
-        this->create_publisher<nav_msgs::msg::Path>("predicted_path", 1);
+    pub_pred_traj_ = this->create_publisher<nav_msgs::msg::Path>(
+        "quadrotor/payload_predicted_path", 1);
 
     // Publish quadrotor desired
     pub_desired_quadrotor_ =
@@ -447,12 +447,15 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
   position_cmd_msg.position.x = quad_pos(0);
   position_cmd_msg.position.y = quad_pos(1);
   position_cmd_msg.position.z = quad_pos(2);
+
   position_cmd_msg.velocity.x = quad_vel(0);
   position_cmd_msg.velocity.y = quad_vel(1);
   position_cmd_msg.velocity.z = quad_vel(2);
+
   position_cmd_msg.acceleration.x = quad_acc(0);
   position_cmd_msg.acceleration.y = quad_acc(1);
   position_cmd_msg.acceleration.z = quad_acc(2);
+
   position_cmd_msg.cable_force.x = cable_force(0);
   position_cmd_msg.cable_force.y = cable_force(1);
   position_cmd_msg.cable_force.z = cable_force(2);
@@ -479,36 +482,21 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
     const double thrust_i = input_i(0);
     const double safe_mass = std::max(std::abs(mass_), 1e-6);
     const Eigen::Vector3d e3(0.0, 0.0, 1.0);
-    const Eigen::Vector3d payload_acceleration =
-        -(thrust_i / safe_mass) * cable_direction - gravity_ * e3;
 
     quadrotor_msgs::msg::TrajectoryPoint point;
-    point.position.x = payload_position(0);
-    point.position.y = payload_position(1);
-    point.position.z = payload_position(2);
-    point.velocity.x = payload_velocity(0);
-    point.velocity.y = payload_velocity(1);
-    point.velocity.z = payload_velocity(2);
-    point.acceleration.x = payload_acceleration(0);
-    point.acceleration.y = payload_acceleration(1);
-    point.acceleration.z = payload_acceleration(2);
-    point.quaternion.w = 1.0;
-    point.quaternion.x = 0.0;
-    point.quaternion.y = 0.0;
-    point.quaternion.z = 0.0;
-    point.angular_velocity.x = cable_angular_velocity(0);
-    point.angular_velocity.y = cable_angular_velocity(1);
-    point.angular_velocity.z = cable_angular_velocity(2);
-    point.force = thrust_i;
-    point.position_quad.x = quad_position(0);
-    point.position_quad.y = quad_position(1);
-    point.position_quad.z = quad_position(2);
-    point.velocity_quad.x = quad_velocity(0);
-    point.velocity_quad.y = quad_velocity(1);
-    point.velocity_quad.z = quad_velocity(2);
-    point.acceleration_quad.x = quad_acceleration(0);
-    point.acceleration_quad.y = quad_acceleration(1);
-    point.acceleration_quad.z = quad_acceleration(2);
+    point.position.x = quad_position(0);
+    point.position.y = quad_position(1);
+    point.position.z = quad_position(2);
+    point.velocity.x = quad_velocity(0);
+    point.velocity.y = quad_velocity(1);
+    point.velocity.z = quad_velocity(2);
+    point.acceleration.x = quad_acceleration(0);
+    point.acceleration.y = quad_acceleration(1);
+    point.acceleration.z = quad_acceleration(2);
+    point.tension = input_i(0);
+    point.cable_r_dot.x = input_i(1);
+    point.cable_r_dot.y = input_i(2);
+    point.cable_r_dot.z = input_i(3);
     position_cmd_msg.points.push_back(point);
   }
 
@@ -539,7 +527,7 @@ Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadStateInput(
   const double thrust_command = input(0);
   const Eigen::Vector3d cable_angular_acceleration_input = input.segment<3>(1);
 
-  const double safe_mass = std::max(std::abs(mass_), 1e-6);
+  const double safe_mass = mass_;
   const Eigen::Vector3d e3(0.0, 0.0, 1.0);
   const Eigen::Vector3d payload_linear_acceleration =
       -(thrust_command / safe_mass) * cable_direction - gravity_ * e3;
