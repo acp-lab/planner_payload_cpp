@@ -693,13 +693,13 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     double* lbu = lubu;
     double* ubu = lubu + NBU;
     lbu[0] = 0.8632800000000002;
-    ubu[0] = 8.632800000000001;
-    lbu[1] = -6;
-    ubu[1] = 6;
-    lbu[2] = -6;
-    ubu[2] = 6;
-    lbu[3] = -6;
-    ubu[3] = 6;
+    ubu[0] = 10.791000000000002;
+    lbu[1] = -10;
+    ubu[1] = 10;
+    lbu[2] = -10;
+    ubu[2] = 10;
+    lbu[3] = -10;
+    ubu[3] = 10;
 
     for (int i = 0; i < N; i++)
     {

@@ -87,9 +87,9 @@ class PayloadControlMujocoNode():
 
         # Maximum and minimun control actions
         self.tension_min = 0.8*self.tensions_init
-        self.tension_max = 8.0*self.tensions_init
+        self.tension_max = 10.0*self.tensions_init
 
-        self.r_dot_max = np.array([6.0, 6.0, 6.0]*self.robot_num, dtype=np.double)
+        self.r_dot_max = np.array([10.0, 10.0, 10.0]*self.robot_num, dtype=np.double)
         self.r_dot_min = -self.r_dot_max
 
         self.u_min =  np.hstack((self.tension_min, self.r_dot_min))

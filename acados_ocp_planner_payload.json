@@ -88,9 +88,9 @@
         "idxsphi_e": [],
         "lbu": [
             0.8632800000000002,
-            -6.0,
-            -6.0,
-            -6.0
+            -10.0,
+            -10.0,
+            -10.0
         ],
         "lbx": [],
         "lbx_0": [
@@ -135,10 +135,10 @@
         "lsphi_0": [],
         "lsphi_e": [],
         "ubu": [
-            8.632800000000001,
-            6.0,
-            6.0,
-            6.0
+            10.791000000000002,
+            10.0,
+            10.0,
+            10.0
         ],
         "ubx": [],
         "ubx_0": [
@@ -302,7 +302,7 @@
         "planner_payload_cost/planner_payload_cost_ext_cost_e_fun_jac_hess.c",
         "planner_payload_cost/planner_payload_cost_ext_cost_e_fun_jac.c"
     ],
-    "hash": "296b9e955b93a89b7eb8c1f1414b5b39",
+    "hash": "8d82878c4319757900603d2a92652fb6",
     "model": {
         "con_h_expr": "MX(@1=vertcat(p_x, p_y, p_z, vx_p, vy_p, vz_p, nx_1, ny_1, nz_1, rx_1, ry_1, rz_1)[6:9], dot(@1, @1))",
         "con_h_expr_0": [],
