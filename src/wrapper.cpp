@@ -9,9 +9,9 @@ solver_input acados_in;
 solver_output acados_out;
 
 void NMPCWrapper::updateHoverInput() {
-  kHoverInput_ = (Eigen::Matrix<real_t, kInputSize, 1>() << mass_ * gravity_,
-                  0.0, 0.0, 0.0)
-                     .finished();
+  // Inputs are rates [tension_dot, r_ddot], so hover/control equilibrium is
+  // zero.
+  kHoverInput_.setZero();
 }
 
 NMPCWrapper::NMPCWrapper() {
@@ -38,6 +38,9 @@ NMPCWrapper::NMPCWrapper() {
   Eigen::Matrix<double, kStateSize, 1> hover_state(
       Eigen::Matrix<double, kStateSize, 1>::Zero());
   hover_state(8) = -1.0;
+  if (kStateSize > 12) {
+    hover_state(12) = mass_ * gravity_;
+  }
 
   // initialize states x and xN and input u.
   acados_initial_state_ = hover_state.template cast<double>();
@@ -62,6 +65,9 @@ void NMPCWrapper::initStates() {
   Eigen::Matrix<double, kStateSize, 1> hover_state(
       Eigen::Matrix<double, kStateSize, 1>::Zero());
   hover_state(8) = -1.0;
+  if (kStateSize > 12) {
+    hover_state(12) = mass_ * gravity_;
+  }
   updateHoverInput();
 
   // initialize states x and xN and input u.

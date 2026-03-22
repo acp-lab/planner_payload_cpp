@@ -12,11 +12,12 @@ NMPCControl::NMPCControl()
   current_state_(8) = -1.0;
   reference_states_.row(8).setConstant(-1.0);
   predicted_states_.row(8).setConstant(-1.0);
+  updateHoverTensionInitialization();
 }
 
 void NMPCControl::setState(const Eigen::Matrix<double, kStateSize, 1> &state,
                            double stamp) {
-  current_state_.block(0, 0, 12, 1) = state.block(0, 0, 12, 1);
+  current_state_ = state;
   stamp_current_state_ = stamp;
 }
 void NMPCControl::setReferenceStates(
@@ -28,8 +29,25 @@ void NMPCControl::setReferenceInputs(
   reference_inputs_ = reference_inputs;
 }
 
-void NMPCControl::setMass(double mass) { wrapper_.setMass(mass); }
-void NMPCControl::setGravity(double gravity) { wrapper_.setGravity(gravity); }
+void NMPCControl::updateHoverTensionInitialization() {
+  if (kStateSize > 12) {
+    const double tension_hover = mass_ * gravity_;
+    current_state_(12) = tension_hover;
+    reference_states_.row(12).setConstant(tension_hover);
+    predicted_states_.row(12).setConstant(tension_hover);
+  }
+}
+
+void NMPCControl::setMass(double mass) {
+  mass_ = mass;
+  updateHoverTensionInitialization();
+  wrapper_.setMass(mass);
+}
+void NMPCControl::setGravity(double gravity) {
+  gravity_ = gravity;
+  updateHoverTensionInitialization();
+  wrapper_.setGravity(gravity);
+}
 void NMPCControl::setWeightMatrices(std::vector<double> Q,
                                     std::vector<double> Q_e,
                                     std::vector<double> R) {

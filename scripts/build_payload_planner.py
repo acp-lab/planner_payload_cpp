@@ -97,12 +97,12 @@ class PayloadControlMujocoNode():
         # Compute the cable initial angular velocity
         self.r_init = np.array([0.0, 0.0, 0.0]*self.robot_num, dtype=np.double)
 
-        # Init states for the optimizer
-        self.x_0 = np.hstack((pos_0, vel_0, self.n_init, self.r_init))
-
-        # Init Control Actions or equilibirum
+        # Init states for the optimizer: [p, v, n, r, tension, r_dot]
         self.r_dot_init = np.array([0.0, 0.0, 0.0]*self.robot_num, dtype=np.double)
-        self.u_equilibrium = np.hstack((self.tensions_init, self.r_dot_init))
+        self.x_0 = np.hstack((pos_0, vel_0, self.n_init, self.r_init, np.array([self.tensions_init]), self.r_dot_init))
+
+        # Init control actions (rates): [tension_dot, r_ddot]
+        self.u_equilibrium = np.zeros((1 + 3*self.robot_num, ), dtype=np.double)
         
         # check equilibirum
         print(self.x_0)
@@ -114,9 +114,14 @@ class PayloadControlMujocoNode():
 
         self.r_dot_max = np.array([10.0, 10.0, 10.0]*self.robot_num, dtype=np.double)
         self.r_dot_min = -self.r_dot_max
+        self.tension_dot_max = 20.0*self.tensions_init
+        self.tension_dot_min = -self.tension_dot_max
+        self.r_ddot_max = np.array([20.0, 20.0, 20.0]*self.robot_num, dtype=np.double)
+        self.r_ddot_min = -self.r_ddot_max
 
-        self.u_min =  np.hstack((self.tension_min, self.r_dot_min))
-        self.u_max =  np.hstack((self.tension_max, self.r_dot_max))
+        # Control bounds are on rates [tension_dot, r_ddot]
+        self.u_min =  np.hstack((self.tension_dot_min, self.r_ddot_min))
+        self.u_max =  np.hstack((self.tension_dot_max, self.r_ddot_max))
 
         # Define state dimension and control action
         self.n_x = self.x_0.shape[0]
@@ -154,33 +159,40 @@ class PayloadControlMujocoNode():
         rz_1 = ca.MX.sym('rz_1')
         r1 = ca.vertcat(rx_1, ry_1, rz_1)
         
-        # Full states of the system (12 x 1)
-        x = ca.vertcat(x_p, v_p, n1, r1)
-        
-        # Control actions of the system
-        t_1_cmd = ca.MX.sym("t_1_cmd")
-        rx_1_cmd = ca.MX.sym("rx_1_cmd")
-        ry_1_cmd = ca.MX.sym("ry_1_cmd")
-        rz_1_cmd = ca.MX.sym("rz_1_cmd")
+        # Augmented states: [payload dynamics, tension, cable angular acceleration state]
+        t_1 = ca.MX.sym("t_1")
+        rdotx_1 = ca.MX.sym("rdotx_1")
+        rdoty_1 = ca.MX.sym("rdoty_1")
+        rdotz_1 = ca.MX.sym("rdotz_1")
+        r1_dot = ca.vertcat(rdotx_1, rdoty_1, rdotz_1)
 
-        r1_cmd = ca.vertcat(rx_1_cmd, ry_1_cmd, rz_1_cmd) 
+        # Full states of the system (16 x 1)
+        x = ca.vertcat(x_p, v_p, n1, r1, t_1, r1_dot)
+        
+        # Control actions are rates: [tension_dot, r_ddot]
+        t_1_dot_cmd = ca.MX.sym("t_1_dot_cmd")
+        rddotx_1_cmd = ca.MX.sym("rddotx_1_cmd")
+        rddoty_1_cmd = ca.MX.sym("rddoty_1_cmd")
+        rddotz_1_cmd = ca.MX.sym("rddotz_1_cmd")
+
+        r1_ddot_cmd = ca.vertcat(rddotx_1_cmd, rddoty_1_cmd, rddotz_1_cmd)
 
         # Vector of control actions
-        u = ca.vertcat(t_1_cmd, rx_1_cmd, ry_1_cmd, rz_1_cmd)
+        u = ca.vertcat(t_1_dot_cmd, rddotx_1_cmd, rddoty_1_cmd, rddotz_1_cmd)
 
         # Linear Dynamics
         linear_velocity = v_p
         cross_angular_payload = ca.cross(r1, n1)
-        linear_acceleration = -(1/(self.mass))*t_1_cmd*n1 - self.gravity*self.e3
+        linear_acceleration = -(1/(self.mass))*t_1*n1 - self.gravity*self.e3
 
         # Angular dynamics
         # Cable Kinematics
         n1_dot = ca.cross(r1, n1)
 
-        r1_dot = (r1_cmd)
+        r1_ddot = r1_ddot_cmd
 
         # Explicit Dynamics
-        f_expl = ca.vertcat(linear_velocity, linear_acceleration, n1_dot, r1_dot)
+        f_expl = ca.vertcat(linear_velocity, linear_acceleration, n1_dot, r1_dot, t_1_dot_cmd, r1_ddot)
 
         nx = x.shape[0]
         nu = u.shape[0]
@@ -231,10 +243,12 @@ class PayloadControlMujocoNode():
         v_p = x[3:6]
         n1 = x[6:9]
         r1 = x[9:12]
+        t_1 = x[12]
+        r1_dot = x[13:16]
 
-        # Split control actions
-        t_cmd = u[0]
-        r_dot_cmd = u[1:4]
+        # Split control actions (rates)
+        t_dot_cmd = u[0]
+        r_ddot_cmd = u[1:4]
 
         # Get desired states of the system
         x_p_d = p[0:3]
@@ -258,8 +272,8 @@ class PayloadControlMujocoNode():
         r_error = r1_d - r1
 
         # Cost Function control actions
-        tension_error = t_d - t_cmd
-        r_dot_error = r_dot_d - r_dot_cmd 
+        tension_error = t_d - t_1
+        r_dot_error = r_dot_d - r1_dot 
         
         # Enforce the velocity is orthogonal
         orthogonality_error = ca.dot(n1, r1)
@@ -267,16 +281,18 @@ class PayloadControlMujocoNode():
         ocp.model.cost_expr_ext_cost = (
             lyapunov_position
             + self.weight_tension * (tension_error * tension_error)
-            + self.weight_rdot * (r_dot_error.T @ r_dot_error)
+            + 0.01 * (t_dot_cmd * t_dot_cmd)
+            + 0.01 * (r_ddot_cmd.T @ r_ddot_cmd)
             + self.weight_orthogonality * (orthogonality_error**2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
+            + self.weight_tension * (tension_error * tension_error)
             + self.weight_orthogonality * (orthogonality_error**2)
         )
 
         ref_params = np.hstack((self.x_0, self.u_equilibrium))
-        cost_params = np.array([210., 210., 210., 1., 1., 1., 5., 5., 5., 1., 1., 1., 210., 210., 210., 1., 1., 1., 5., 5., 5., 1., 1., 1., 0.5, 0.1, 0.1, 0.1])
+        cost_params = np.zeros((nx + nx + nu, ), dtype=np.double)
         ocp.parameter_values = np.concatenate([ref_params, cost_params])
 
         ocp.constraints.constr_type = 'BGH'
@@ -285,6 +301,10 @@ class PayloadControlMujocoNode():
         ocp.constraints.lbu = self.u_min
         ocp.constraints.ubu = self.u_max
         ocp.constraints.idxbu = np.array([0, 1, 2, 3])
+        # Keep augmented tension and r_dot states within physical limits.
+        ocp.constraints.idxbx = np.array([12, 13, 14, 15], dtype=np.int32)
+        ocp.constraints.lbx = np.hstack((self.tension_min, self.r_dot_min))
+        ocp.constraints.ubx = np.hstack((self.tension_max, self.r_dot_max))
         ocp.constraints.x0 = x0
 
         # Softly enforce ||n1|| ~= 1 to improve robustness against numerical drift.

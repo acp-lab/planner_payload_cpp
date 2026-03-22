@@ -41,10 +41,10 @@ public:
 
     this->declare_parameter<std::vector<double>>(
         "nmpc.Q", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5., 5.,
-                                      1., 1., 1.});
+                                      1., 1., 1., 50., 10., 10., 10.});
     this->declare_parameter<std::vector<double>>(
         "nmpc.Q_e", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
-                                        5., 1., 1., 1.});
+                                        5., 1., 1., 1., 50., 10., 10., 10.});
     this->declare_parameter<std::vector<double>>(
         "nmpc.R", std::vector<double>{0.5, 0.1, 0.1, 0.1});
 
@@ -168,9 +168,8 @@ private:
   Eigen::Vector3d quadrotorVelocityFromPayloadState(
       const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state)
       const;
-  Eigen::Vector3d quadrotorAccelerationFromPayloadStateInput(
-      const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state,
-      const Eigen::Ref<const Eigen::Matrix<double, kInputSize, 1>> &input)
+  Eigen::Vector3d quadrotorAccelerationFromPayloadState(
+      const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state)
       const;
 
   void activate_payload_callback(
@@ -216,7 +215,8 @@ void NMPCControlNodelet::activate_payload_callback(
 
 void NMPCControlNodelet::payloadOdomCallback(
     const nav_msgs::msg::Odometry::SharedPtr odom_msg) {
-  Eigen::Matrix<double, 12, 1> state(Eigen::Matrix<double, 12, 1>::Zero());
+  Eigen::Matrix<double, kStateSize, 1> state(
+      Eigen::Matrix<double, kStateSize, 1>::Zero());
 
   frame_id_ = odom_msg->header.frame_id;
   state(0) = odom_msg->pose.pose.position.x;
@@ -246,6 +246,17 @@ void NMPCControlNodelet::payloadOdomCallback(
   state.segment<3>(6) = cable_dir;
   state.segment<3>(9) = cable_r;
 
+  // Tension and cable angular acceleration are not measured: use predicted
+  // values from previous NMPC solve, with a hover fallback.
+  state(12) = mass_payload_ * gravity_;
+  state.segment<3>(13).setZero();
+  const Eigen::Matrix<double, kStateSize, 1> predicted_state =
+      controller_.getPredictedState();
+  if (predicted_state.allFinite() && predicted_state(12) > 1e-6) {
+    state(12) = predicted_state(12);
+    state.segment<3>(13) = predicted_state.segment<3>(13);
+  }
+
   const double stamp_sec =
       static_cast<double>(odom_msg->header.stamp.sec) +
       static_cast<double>(odom_msg->header.stamp.nanosec) * 1e-9;
@@ -265,8 +276,6 @@ void NMPCControlNodelet::referenceCallback(
 
   const size_t n_points = reference_msg->points.size();
 
-  int number_iterations = n_points;
-
   if (n_points == 0) {
     for (int i = 0; i < kSamples; ++i) {
       reference_states(0, i) = reference_msg->position.x;
@@ -277,11 +286,11 @@ void NMPCControlNodelet::referenceCallback(
       reference_states(5, i) = reference_msg->velocity.z;
       reference_states.block<3, 1>(6, i) = n_eq;
       reference_states.block<3, 1>(9, i) = r_eq;
+      reference_states(12, i) = thrust_eq;
+      reference_states.block<3, 1>(13, i).setZero();
 
-      reference_inputs(0, i) = thrust_eq;
-      reference_inputs(1, i) = 0.0;
-      reference_inputs(2, i) = 0.0;
-      reference_inputs(3, i) = 0.0;
+      // Inputs are [tension_dot, r_ddot] references.
+      reference_inputs.col(i).setZero();
     }
     RCLCPP_WARN_THROTTLE(this->get_logger(), clock_, 1000,
                          "[PayloadOlanner] Obtaining only one point reference");
@@ -301,11 +310,12 @@ void NMPCControlNodelet::referenceCallback(
       reference_states(7, i) = point.cable_direction.y;
       reference_states(8, i) = point.cable_direction.z;
       reference_states.block<3, 1>(9, i) = r_eq;
+      reference_states(12, i) = point.tension;
+      reference_states(13, i) = point.cable_r_dot.x;
+      reference_states(14, i) = point.cable_r_dot.y;
+      reference_states(15, i) = point.cable_r_dot.z;
 
-      reference_inputs(0, i) = point.tension;
-      reference_inputs(1, i) = 0.0;
-      reference_inputs(2, i) = 0.0;
-      reference_inputs(3, i) = 0.0;
+      reference_inputs.col(i).setZero();
     }
   }
 
@@ -417,7 +427,6 @@ void NMPCControlNodelet::publishReference() {
 
 void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
   const auto predicted_states = controller_.getPredictedStates();
-  const auto predicted_inputs = controller_.getPredictedInputs();
 
   quadrotor_msgs::msg::PositionCommand position_cmd_msg;
   position_cmd_msg.header.stamp = this->now();
@@ -428,15 +437,13 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
   position_cmd_msg.yaw_dot = 0.0;
 
   const int first_state_idx = std::min(1, kSamples - 1);
-  const int first_input_idx = 0;
   const Eigen::Vector3d quad_pos =
       quadrotorPositionFromPayloadState(predicted_states.col(first_state_idx));
   const Eigen::Vector3d quad_vel =
       quadrotorVelocityFromPayloadState(predicted_states.col(first_state_idx));
-  const Eigen::Vector3d quad_acc = quadrotorAccelerationFromPayloadStateInput(
-      predicted_states.col(first_state_idx),
-      predicted_inputs.col(first_input_idx));
-  const double tension = predicted_inputs(0, first_input_idx);
+  const Eigen::Vector3d quad_acc = quadrotorAccelerationFromPayloadState(
+      predicted_states.col(first_state_idx));
+  const double tension = predicted_states(12, first_state_idx);
   const Eigen::Vector3d direction =
       predicted_states.col(first_state_idx).segment<3>(6);
   const Eigen::Vector3d cable_force = tension * direction;
@@ -460,25 +467,14 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
   position_cmd_msg.points.reserve(kSamples);
   for (int i = 0; i < kSamples; ++i) {
     const int state_idx = std::min(i + 1, kSamples - 1);
-    const int input_idx = std::min(i, kSamples - 1);
     const auto state_i = predicted_states.col(state_idx);
-    const auto input_i = predicted_inputs.col(input_idx);
-
-    const Eigen::Vector3d payload_position = state_i.segment<3>(0);
-    const Eigen::Vector3d payload_velocity = state_i.segment<3>(3);
-    const Eigen::Vector3d cable_direction = state_i.segment<3>(6);
-    const Eigen::Vector3d cable_angular_velocity = state_i.segment<3>(9);
 
     const Eigen::Vector3d quad_position =
         quadrotorPositionFromPayloadState(state_i);
     const Eigen::Vector3d quad_velocity =
         quadrotorVelocityFromPayloadState(state_i);
     const Eigen::Vector3d quad_acceleration =
-        quadrotorAccelerationFromPayloadStateInput(state_i, input_i);
-
-    const double thrust_i = input_i(0);
-    const double safe_mass = std::max(std::abs(mass_payload_), 1e-6);
-    const Eigen::Vector3d e3(0.0, 0.0, 1.0);
+        quadrotorAccelerationFromPayloadState(state_i);
 
     quadrotor_msgs::msg::TrajectoryPoint point;
     point.position.x = quad_position(0);
@@ -490,10 +486,10 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
     point.acceleration.x = quad_acceleration(0);
     point.acceleration.y = quad_acceleration(1);
     point.acceleration.z = quad_acceleration(2);
-    point.tension = input_i(0);
-    point.cable_r_dot.x = input_i(1);
-    point.cable_r_dot.y = input_i(2);
-    point.cable_r_dot.z = input_i(3);
+    point.tension = state_i(12);
+    point.cable_r_dot.x = state_i(13);
+    point.cable_r_dot.y = state_i(14);
+    point.cable_r_dot.z = state_i(15);
     position_cmd_msg.points.push_back(point);
   }
 
@@ -516,20 +512,19 @@ Eigen::Vector3d NMPCControlNodelet::quadrotorVelocityFromPayloadState(
          cable_length_ * cable_angular_velocity.cross(cable_direction);
 }
 
-Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadStateInput(
-    const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state,
-    const Eigen::Ref<const Eigen::Matrix<double, kInputSize, 1>> &input) const {
+Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadState(
+    const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state) const {
   const Eigen::Vector3d cable_direction = state.segment<3>(6);
   const Eigen::Vector3d cable_angular_velocity = state.segment<3>(9);
-  const double thrust_command = input(0);
-  const Eigen::Vector3d cable_angular_acceleration_input = input.segment<3>(1);
+  const double tension = state(12);
+  const Eigen::Vector3d cable_angular_acceleration = state.segment<3>(13);
 
   const double safe_mass = mass_payload_;
   const Eigen::Vector3d e3(0.0, 0.0, 1.0);
   const Eigen::Vector3d payload_linear_acceleration =
-      -(thrust_command / safe_mass) * cable_direction - gravity_ * e3;
+      -(tension / safe_mass) * cable_direction - gravity_ * e3;
   const Eigen::Vector3d input_angular_acc_cable =
-      -cable_length_ * cable_angular_acceleration_input.cross(cable_direction);
+      -cable_length_ * cable_angular_acceleration.cross(cable_direction);
   const Eigen::Vector3d cable_angular_velocity_aux =
       cable_angular_velocity.cross(cable_direction);
   const Eigen::Vector3d angular_velocity_cable =

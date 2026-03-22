@@ -32,8 +32,12 @@ public:
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
+  void updateHoverTensionInitialization();
+
   bool solve_from_scratch_;
   double stamp_current_state_;
+  double mass_{1.0};
+  double gravity_{9.81};
   Eigen::Matrix<double, kStateSize, 1> current_state_;
   Eigen::Matrix<double, kStateSize, kSamples> reference_states_;
   Eigen::Matrix<double, kInputSize, kSamples> reference_inputs_;

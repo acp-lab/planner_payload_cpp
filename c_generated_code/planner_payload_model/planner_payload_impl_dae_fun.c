@@ -65,23 +65,23 @@ void casadi_copy(const casadi_real* x, casadi_int n, casadi_real* y) {
   }
 }
 
-static const casadi_int casadi_s0[3] = {12, 1, 1};
+static const casadi_int casadi_s0[3] = {16, 1, 1};
 static const casadi_int casadi_s1[3] = {4, 1, 1};
 static const casadi_int casadi_s2[3] = {0, 1, 1};
 static const casadi_int casadi_s3[3] = {0, 0, 1};
-static const casadi_int casadi_s4[3] = {44, 1, 1};
+static const casadi_int casadi_s4[3] = {56, 1, 1};
 
 static const casadi_real casadi_c0[3] = {0., 0., 9.8100000000000005e+00};
 
-static const casadi_real casadi_zeros[12] = 
+static const casadi_real casadi_zeros[16] = 
   {0., 0., 0., 0., 0., 0., 0., 0.,
-  0., 0., 0., 0.};
+  0., 0., 0., 0., 0., 0., 0., 0.};
 
-/* planner_payload_impl_dae_fun:(i0[12],i1[12],i2[4],i3[0],i4[],i5[44])->(o0[12]) */
+/* planner_payload_impl_dae_fun:(i0[16],i1[16],i2[4],i3[0],i4[],i5[56])->(o0[16]) */
 static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem) {
   casadi_int i;
-  casadi_real *rr, *w00=w+0, w01, w02, w03, w04, w05, w06, w07, *w08=w+19, *w09=w+22, w10;
-  casadi_real w11, w12, *w13=w+28;
+  casadi_real *rr, *w00=w+0, w01, w02, w03, w04, w05, w06, w07, *w08=w+23, *w09=w+26, w10;
+  casadi_real w11, w12, w13, w14, w15, *w16=w+35;
   const casadi_real *cr, *cs, *wr00;
   /* #0: @0 = input[1][0] */
   wr00 = arg[1] ? arg[1] : casadi_zeros;
@@ -93,8 +93,8 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   w03 = arg[0] ? arg[0][5] : 0;
   /* #4: @4 = -8.86525 */
   w04 = -8.8652482269503547e+00;
-  /* #5: @5 = input[2][0] */
-  w05 = arg[2] ? arg[2][0] : 0;
+  /* #5: @5 = input[0][12] */
+  w05 = arg[0] ? arg[0][12] : 0;
   /* #6: @4 = (@4*@5) */
   w04 *= w05;
   /* #7: @5 = input[0][6] */
@@ -138,14 +138,22 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   w04 *= w05;
   /* #25: @12 = (@12-@4) */
   w12 -= w04;
-  /* #26: @4 = input[2][1] */
-  w04 = arg[2] ? arg[2][1] : 0;
-  /* #27: @5 = input[2][2] */
-  w05 = arg[2] ? arg[2][2] : 0;
-  /* #28: @6 = input[2][3] */
-  w06 = arg[2] ? arg[2][3] : 0;
-  /* #29: @13 = vertcat(@1, @2, @3, @8, @10, @11, @12, @4, @5, @6) */
-  rr=w13;
+  /* #26: @4 = input[0][13] */
+  w04 = arg[0] ? arg[0][13] : 0;
+  /* #27: @5 = input[0][14] */
+  w05 = arg[0] ? arg[0][14] : 0;
+  /* #28: @6 = input[0][15] */
+  w06 = arg[0] ? arg[0][15] : 0;
+  /* #29: @7 = input[2][0] */
+  w07 = arg[2] ? arg[2][0] : 0;
+  /* #30: @13 = input[2][1] */
+  w13 = arg[2] ? arg[2][1] : 0;
+  /* #31: @14 = input[2][2] */
+  w14 = arg[2] ? arg[2][2] : 0;
+  /* #32: @15 = input[2][3] */
+  w15 = arg[2] ? arg[2][3] : 0;
+  /* #33: @16 = vertcat(@1, @2, @3, @8, @10, @11, @12, @4, @5, @6, @7, @13, @14, @15) */
+  rr=w16;
   *rr++ = w01;
   *rr++ = w02;
   *rr++ = w03;
@@ -156,10 +164,14 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   *rr++ = w04;
   *rr++ = w05;
   *rr++ = w06;
-  /* #30: @0 = (@0-@13) */
-  for (i=0, rr=w00, cr=wr00, cs=w13; i<12; ++i) (*rr++)  = ((*cr++)-(*cs++));
-  /* #31: output[0][0] = @0 */
-  casadi_copy(w00, 12, res[0]);
+  *rr++ = w07;
+  *rr++ = w13;
+  *rr++ = w14;
+  *rr++ = w15;
+  /* #34: @0 = (@0-@16) */
+  for (i=0, rr=w00, cr=wr00, cs=w16; i<16; ++i) (*rr++)  = ((*cr++)-(*cs++));
+  /* #35: output[0][0] = @0 */
+  casadi_copy(w00, 16, res[0]);
   return 0;
 }
 
@@ -240,18 +252,18 @@ CASADI_SYMBOL_EXPORT const casadi_int* planner_payload_impl_dae_fun_sparsity_out
 }
 
 CASADI_SYMBOL_EXPORT int planner_payload_impl_dae_fun_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w) {
-  if (sz_arg) *sz_arg = 16;
+  if (sz_arg) *sz_arg = 20;
   if (sz_res) *sz_res = 2;
   if (sz_iw) *sz_iw = 0;
-  if (sz_w) *sz_w = 40;
+  if (sz_w) *sz_w = 51;
   return 0;
 }
 
 CASADI_SYMBOL_EXPORT int planner_payload_impl_dae_fun_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w) {
-  if (sz_arg) *sz_arg = 16*sizeof(const casadi_real*);
+  if (sz_arg) *sz_arg = 20*sizeof(const casadi_real*);
   if (sz_res) *sz_res = 2*sizeof(casadi_real*);
   if (sz_iw) *sz_iw = 0*sizeof(casadi_int);
-  if (sz_w) *sz_w = 40*sizeof(casadi_real);
+  if (sz_w) *sz_w = 51*sizeof(casadi_real);
   return 0;
 }
 

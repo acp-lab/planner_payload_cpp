@@ -36,13 +36,13 @@
 #include "acados_c/ocp_nlp_interface.h"
 #include "acados_c/external_function_interface.h"
 
-#define PLANNER_PAYLOAD_NX     12
+#define PLANNER_PAYLOAD_NX     16
 #define PLANNER_PAYLOAD_NZ     0
 #define PLANNER_PAYLOAD_NU     4
-#define PLANNER_PAYLOAD_NP     44
+#define PLANNER_PAYLOAD_NP     56
 #define PLANNER_PAYLOAD_NP_GLOBAL     0
-#define PLANNER_PAYLOAD_NBX    0
-#define PLANNER_PAYLOAD_NBX0   12
+#define PLANNER_PAYLOAD_NBX    4
+#define PLANNER_PAYLOAD_NBX0   16
 #define PLANNER_PAYLOAD_NBU    4
 #define PLANNER_PAYLOAD_NSBX   0
 #define PLANNER_PAYLOAD_NSBU   0

@@ -243,7 +243,7 @@ static ocp_nlp_dims* planner_payload_acados_create_setup_dimensions(planner_payl
     nsbx[0] = 0;
     ns[0] = NS0;
     
-    nbxe[0] = 12;
+    nbxe[0] = 16;
     
     ny[0] = NY0;
     nh[0] = NH0;
@@ -421,34 +421,6 @@ void planner_payload_acados_create_set_default_parameters(planner_payload_solver
     p[2] = 0.47;
     p[8] = -1;
     p[12] = 1.106568;
-    p[16] = 210;
-    p[17] = 210;
-    p[18] = 210;
-    p[19] = 1;
-    p[20] = 1;
-    p[21] = 1;
-    p[22] = 5;
-    p[23] = 5;
-    p[24] = 5;
-    p[25] = 1;
-    p[26] = 1;
-    p[27] = 1;
-    p[28] = 210;
-    p[29] = 210;
-    p[30] = 210;
-    p[31] = 1;
-    p[32] = 1;
-    p[33] = 1;
-    p[34] = 5;
-    p[35] = 5;
-    p[36] = 5;
-    p[37] = 1;
-    p[38] = 1;
-    p[39] = 1;
-    p[40] = 0.5;
-    p[41] = 0.1;
-    p[42] = 0.1;
-    p[43] = 0.1;
 
     for (int i = 0; i <= N; i++) {
         planner_payload_acados_update_params(capsule, i, p, NP);
@@ -614,6 +586,10 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     idxbx0[9] = 9;
     idxbx0[10] = 10;
     idxbx0[11] = 11;
+    idxbx0[12] = 12;
+    idxbx0[13] = 13;
+    idxbx0[14] = 14;
+    idxbx0[15] = 15;
 
     double* lubx0 = calloc(2*NBX0, sizeof(double));
     double* lbx0 = lubx0;
@@ -623,6 +599,8 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     ubx0[2] = 0.47;
     lbx0[8] = -1;
     ubx0[8] = -1;
+    lbx0[12] = 1.106568;
+    ubx0[12] = 1.106568;
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "idxbx", idxbx0);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "lbx", lbx0);
@@ -630,7 +608,7 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     free(idxbx0);
     free(lubx0);
     // idxbxe_0
-    int* idxbxe_0 = malloc(12 * sizeof(int));
+    int* idxbxe_0 = malloc(16 * sizeof(int));
     idxbxe_0[0] = 0;
     idxbxe_0[1] = 1;
     idxbxe_0[2] = 2;
@@ -643,6 +621,10 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     idxbxe_0[9] = 9;
     idxbxe_0[10] = 10;
     idxbxe_0[11] = 11;
+    idxbxe_0[12] = 12;
+    idxbxe_0[13] = 13;
+    idxbxe_0[14] = 14;
+    idxbxe_0[15] = 15;
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, 0, "idxbxe", idxbxe_0);
     free(idxbxe_0);
 
@@ -667,14 +649,14 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
-    lbu[0] = 0.553284;
-    ubu[0] = 11.06568;
-    lbu[1] = -10;
-    ubu[1] = 10;
-    lbu[2] = -10;
-    ubu[2] = 10;
-    lbu[3] = -10;
-    ubu[3] = 10;
+    lbu[0] = -22.13136;
+    ubu[0] = 22.13136;
+    lbu[1] = -20;
+    ubu[1] = 20;
+    lbu[2] = -20;
+    ubu[2] = 20;
+    lbu[3] = -20;
+    ubu[3] = 20;
 
     for (int i = 0; i < N; i++)
     {
@@ -692,6 +674,32 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
 
     /* Path constraints */
 
+    // x
+    int* idxbx = malloc(NBX * sizeof(int));
+    idxbx[0] = 12;
+    idxbx[1] = 13;
+    idxbx[2] = 14;
+    idxbx[3] = 15;
+    double* lubx = calloc(2*NBX, sizeof(double));
+    double* lbx = lubx;
+    double* ubx = lubx + NBX;
+    lbx[0] = 0.553284;
+    ubx[0] = 11.06568;
+    lbx[1] = -10;
+    ubx[1] = 10;
+    lbx[2] = -10;
+    ubx[2] = 10;
+    lbx[3] = -10;
+    ubx[3] = 10;
+
+    for (int i = 1; i < N; i++)
+    {
+        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "idxbx", idxbx);
+        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lbx", lbx);
+        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "ubx", ubx);
+    }
+    free(idxbx);
+    free(lubx);
 
 
 
@@ -877,6 +885,7 @@ void planner_payload_acados_set_nlp_out(planner_payload_solver_capsule* capsule)
     // initialize with x0
     x0[2] = 0.47;
     x0[8] = -1;
+    x0[12] = 1.106568;
 
 
     double* u0 = xu0 + NX;
@@ -1010,7 +1019,7 @@ int planner_payload_acados_update_params(planner_payload_solver_capsule* capsule
 {
     int solver_status = 0;
 
-    int casadi_np = 44;
+    int casadi_np = 56;
     if (casadi_np != np) {
         printf("acados_update_params: trying to set %i parameters for external functions."
             " External function has %i parameters. Exiting.\n", np, casadi_np);

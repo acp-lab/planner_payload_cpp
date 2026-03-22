@@ -34,10 +34,10 @@
 #include "acados_c/sim_interface.h"
 #include "acados_c/external_function_interface.h"
 
-#define PLANNER_PAYLOAD_NX     12
+#define PLANNER_PAYLOAD_NX     16
 #define PLANNER_PAYLOAD_NZ     0
 #define PLANNER_PAYLOAD_NU     4
-#define PLANNER_PAYLOAD_NP     44
+#define PLANNER_PAYLOAD_NP     56
 
 #ifdef __cplusplus
 extern "C" {

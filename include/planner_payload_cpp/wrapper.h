@@ -142,8 +142,7 @@ private:
   Eigen::Map<Eigen::Matrix<double, kInputSize, kSamples, Eigen::ColMajor>>
       acados_inputs_{acados_out.u_out};
   Eigen::Matrix<real_t, kInputSize, 1> kHoverInput_ =
-      (Eigen::Matrix<real_t, kInputSize, 1>() << 9.81, 0.0, 0.0, 0.0)
-          .finished();
+      Eigen::Matrix<real_t, kInputSize, 1>::Zero();
 };
 
 } // namespace planner_payload_nodelet

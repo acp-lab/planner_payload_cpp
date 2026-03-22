@@ -196,34 +196,6 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
     p[2] = 0.47;
     p[8] = -1;
     p[12] = 1.106568;
-    p[16] = 210;
-    p[17] = 210;
-    p[18] = 210;
-    p[19] = 1;
-    p[20] = 1;
-    p[21] = 1;
-    p[22] = 5;
-    p[23] = 5;
-    p[24] = 5;
-    p[25] = 1;
-    p[26] = 1;
-    p[27] = 1;
-    p[28] = 210;
-    p[29] = 210;
-    p[30] = 210;
-    p[31] = 1;
-    p[32] = 1;
-    p[33] = 1;
-    p[34] = 5;
-    p[35] = 5;
-    p[36] = 5;
-    p[37] = 1;
-    p[38] = 1;
-    p[39] = 1;
-    p[40] = 0.5;
-    p[41] = 0.1;
-    p[42] = 0.1;
-    p[43] = 0.1;
 
     planner_payload_acados_sim_update_params(capsule, p, np);
     free(p);
@@ -231,8 +203,8 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
 
     /* initialize input */
     // x
-    double x0[12];
-    for (int ii = 0; ii < 12; ii++)
+    double x0[16];
+    for (int ii = 0; ii < 16; ii++)
         x0[ii] = 0.0;
 
     sim_in_set(planner_payload_sim_config, planner_payload_sim_dims,
@@ -248,11 +220,11 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
                planner_payload_sim_in, "u", u0);
 
     // S_forw
-    double S_forw[192];
-    for (int ii = 0; ii < 192; ii++)
+    double S_forw[320];
+    for (int ii = 0; ii < 320; ii++)
         S_forw[ii] = 0.0;
-    for (int ii = 0; ii < 12; ii++)
-        S_forw[ii + ii * 12 ] = 1.0;
+    for (int ii = 0; ii < 16; ii++)
+        S_forw[ii + ii * 16 ] = 1.0;
 
 
     sim_in_set(planner_payload_sim_config, planner_payload_sim_dims,
