@@ -42,7 +42,6 @@
 #include "planner_payload_model/planner_payload_model.h"
 
 
-#include "planner_payload_constraints/planner_payload_constraints.h"
 #include "planner_payload_cost/planner_payload_cost.h"
 
 
@@ -166,7 +165,7 @@ void planner_payload_acados_create_set_plan(ocp_nlp_plan_t* nlp_solver_plan, con
     for (int i = 0; i < N; i++)
     {
         nlp_solver_plan->nlp_dynamics[i] = CONTINUOUS_MODEL;
-        nlp_solver_plan->sim_solver_plan[i].sim_solver = ERK;
+        nlp_solver_plan->sim_solver_plan[i].sim_solver = IRK;
     }
 
     nlp_solver_plan->nlp_constraints[0] = BGH;
@@ -339,20 +338,6 @@ void planner_payload_acados_create_setup_functions(planner_payload_solver_capsul
     ext_fun_opts.external_workspace = true;
     if (N > 0)
     {
-        // constraints.constr_type == "BGH" and dims.nh > 0
-        capsule->nl_constr_h_fun_jac = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-        for (int i = 0; i < N-1; i++) {
-            MAP_CASADI_FNC(nl_constr_h_fun_jac[i], planner_payload_constr_h_fun_jac_uxt_zt);
-        }
-        capsule->nl_constr_h_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-        for (int i = 0; i < N-1; i++) {
-            MAP_CASADI_FNC(nl_constr_h_fun[i], planner_payload_constr_h_fun);
-        }
-        capsule->nl_constr_h_fun_jac_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-        for (int i = 0; i < N-1; i++) {
-            MAP_CASADI_FNC(nl_constr_h_fun_jac_hess[i], planner_payload_constr_h_fun_jac_uxt_zt_hess);
-        }
-    
         // external cost
         MAP_CASADI_FNC(ext_cost_0_fun, planner_payload_cost_ext_cost_0_fun);
         MAP_CASADI_FNC(ext_cost_0_fun_jac, planner_payload_cost_ext_cost_0_fun_jac);
@@ -361,28 +346,27 @@ void planner_payload_acados_create_setup_functions(planner_payload_solver_capsul
 
 
     
-        // explicit ode
-        capsule->expl_vde_forw = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        // implicit dae
+        capsule->impl_dae_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
         for (int i = 0; i < N; i++) {
-            MAP_CASADI_FNC(expl_vde_forw[i], planner_payload_expl_vde_forw);
+            MAP_CASADI_FNC(impl_dae_fun[i], planner_payload_impl_dae_fun);
+        }
+
+        capsule->impl_dae_fun_jac_x_xdot_z = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++) {
+            MAP_CASADI_FNC(impl_dae_fun_jac_x_xdot_z[i], planner_payload_impl_dae_fun_jac_x_xdot_z);
+        }
+
+        capsule->impl_dae_jac_x_xdot_u_z = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        for (int i = 0; i < N; i++) {
+            MAP_CASADI_FNC(impl_dae_jac_x_xdot_u_z[i], planner_payload_impl_dae_jac_x_xdot_u_z);
         }
 
         
-
-        capsule->expl_ode_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
+        capsule->impl_dae_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
         for (int i = 0; i < N; i++) {
-            MAP_CASADI_FNC(expl_ode_fun[i], planner_payload_expl_ode_fun);
+            MAP_CASADI_FNC(impl_dae_hess[i], planner_payload_impl_dae_hess);
         }
-
-        capsule->expl_vde_adj = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-        for (int i = 0; i < N; i++) {
-            MAP_CASADI_FNC(expl_vde_adj[i], planner_payload_expl_vde_adj);
-        }
-        capsule->expl_ode_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-        for (int i = 0; i < N; i++) {
-            MAP_CASADI_FNC(expl_ode_hess[i], planner_payload_expl_ode_hess);
-        }
-
     
         // external cost
         capsule->ext_cost_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
@@ -436,7 +420,7 @@ void planner_payload_acados_create_set_default_parameters(planner_payload_solver
     double* p = calloc(NP, sizeof(double));
     p[2] = 0.47;
     p[8] = -1;
-    p[12] = 1.0791000000000002;
+    p[12] = 1.106568;
     p[16] = 210;
     p[17] = 210;
     p[18] = 210;
@@ -578,11 +562,13 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     /**** Dynamics ****/
     for (int i = 0; i < N; i++)
     {
-        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "expl_vde_forw", &capsule->expl_vde_forw[i]);
+        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "impl_dae_fun", &capsule->impl_dae_fun[i]);
+        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i,
+                                   "impl_dae_fun_jac_x_xdot_z", &capsule->impl_dae_fun_jac_x_xdot_z[i]);
+        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i,
+                                   "impl_dae_jac_x_xdot_u", &capsule->impl_dae_jac_x_xdot_u_z[i]);
         
-        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "expl_ode_fun", &capsule->expl_ode_fun[i]);
-        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "expl_vde_adj", &capsule->expl_vde_adj[i]);
-        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "expl_ode_hess", &capsule->expl_ode_hess[i]);
+        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "impl_dae_hess", &capsule->impl_dae_hess[i]);
     }
 
     /**** Cost ****/
@@ -608,26 +594,6 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
 
 
 
-    // slacks
-    double* zlumem = calloc(4*NS, sizeof(double));
-    double* Zl = zlumem+NS*0;
-    double* Zu = zlumem+NS*1;
-    double* zl = zlumem+NS*2;
-    double* zu = zlumem+NS*3;
-    // change only the non-zero elements:
-    Zl[0] = 0.1;
-    Zu[0] = 0.1;
-    zl[0] = 0.1;
-    zu[0] = 0.1;
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "Zl", Zl);
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "Zu", Zu);
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "zl", zl);
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "zu", zu);
-    }
-    free(zlumem);
 
 
 
@@ -701,8 +667,8 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
-    lbu[0] = 0.8632800000000002;
-    ubu[0] = 10.791000000000002;
+    lbu[0] = 0.553284;
+    ubu[0] = 11.06568;
     lbu[1] = -10;
     ubu[1] = 10;
     lbu[2] = -10;
@@ -728,29 +694,6 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
 
 
 
-    // set up nonlinear constraints for stage 1 to N-1
-    double* luh = calloc(2*NH, sizeof(double));
-    double* lh = luh;
-    double* uh = luh + NH;
-    lh[0] = 0.999;
-    uh[0] = 1.001;
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nl_constr_h_fun_jac",
-                                      &capsule->nl_constr_h_fun_jac[i-1]);
-        ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nl_constr_h_fun",
-                                      &capsule->nl_constr_h_fun[i-1]);
-        
-        ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i,
-                                      "nl_constr_h_fun_jac_hess", &capsule->nl_constr_h_fun_jac_hess[i-1]);
-        
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lh", lh);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "uh", uh);
-        
-        
-    }
-    free(luh);
 
 
 
@@ -759,21 +702,6 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
 
 
 
-    // set up soft bounds for nonlinear constraints
-    int* idxsh = malloc(NSH * sizeof(int));
-    idxsh[0] = 0;
-    double* lush = calloc(2*NSH, sizeof(double));
-    double* lsh = lush;
-    double* ush = lush + NSH;
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "idxsh", idxsh);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lsh", lsh);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "ush", ush);
-    }
-    free(idxsh);
-    free(lush);
 
 
 
@@ -852,7 +780,7 @@ static void planner_payload_acados_create_set_opts(planner_payload_solver_capsul
 
     // set up sim_method_num_steps
     // all sim_method_num_steps are identical
-    int sim_method_num_steps = 1;
+    int sim_method_num_steps = 2;
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_num_steps", &sim_method_num_steps);
 
@@ -862,11 +790,11 @@ static void planner_payload_acados_create_set_opts(planner_payload_solver_capsul
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_num_stages", &sim_method_num_stages);
 
-    int newton_iter_val = 3;
+    int newton_iter_val = 20;
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_newton_iter", &newton_iter_val);
 
-    double newton_tol_val = 0;
+    double newton_tol_val = 0.0000000001;
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_newton_tol", &newton_tol_val);
 
@@ -875,7 +803,7 @@ static void planner_payload_acados_create_set_opts(planner_payload_solver_capsul
     for (int i = 0; i < N; i++)
         ocp_nlp_solver_opts_set_at_stage(nlp_config, nlp_opts, i, "dynamics_jac_reuse", &tmp_bool);
 
-    double levenberg_marquardt = 10;
+    double levenberg_marquardt = 0.000001;
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "levenberg_marquardt", &levenberg_marquardt);
 
     /* options QP solver */
@@ -1066,6 +994,8 @@ int planner_payload_acados_reset(planner_payload_solver_capsule* capsule, int re
         if (i<N)
         {
             ocp_nlp_out_set(nlp_config, nlp_dims, nlp_out, nlp_in, i, "pi", buffer);
+            ocp_nlp_set(nlp_solver, i, "xdot_guess", buffer);
+            ocp_nlp_set(nlp_solver, i, "z_guess", buffer);
         }
     }
 
@@ -1150,17 +1080,17 @@ int planner_payload_acados_free(planner_payload_solver_capsule* capsule)
     // dynamics
     for (int i = 0; i < N; i++)
     {
-        external_function_external_param_casadi_free(&capsule->expl_vde_forw[i]);
+        external_function_external_param_casadi_free(&capsule->impl_dae_fun[i]);
+        external_function_external_param_casadi_free(&capsule->impl_dae_fun_jac_x_xdot_z[i]);
+        external_function_external_param_casadi_free(&capsule->impl_dae_jac_x_xdot_u_z[i]);
         
-        external_function_external_param_casadi_free(&capsule->expl_ode_fun[i]);
-        external_function_external_param_casadi_free(&capsule->expl_vde_adj[i]);
-        external_function_external_param_casadi_free(&capsule->expl_ode_hess[i]);
+        external_function_external_param_casadi_free(&capsule->impl_dae_hess[i]);
     }
-    free(capsule->expl_vde_adj);
-    free(capsule->expl_vde_forw);
+    free(capsule->impl_dae_fun);
+    free(capsule->impl_dae_fun_jac_x_xdot_z);
+    free(capsule->impl_dae_jac_x_xdot_u_z);
     
-    free(capsule->expl_ode_fun);
-    free(capsule->expl_ode_hess);
+    free(capsule->impl_dae_hess);
 
     // cost
     external_function_external_param_casadi_free(&capsule->ext_cost_0_fun);
@@ -1186,15 +1116,6 @@ int planner_payload_acados_free(planner_payload_solver_capsule* capsule)
     
 
     // constraints
-    for (int i = 0; i < N-1; i++)
-    {
-        external_function_external_param_casadi_free(&capsule->nl_constr_h_fun_jac[i]);
-        external_function_external_param_casadi_free(&capsule->nl_constr_h_fun[i]);
-        external_function_external_param_casadi_free(&capsule->nl_constr_h_fun_jac_hess[i]);
-    }
-    free(capsule->nl_constr_h_fun_jac);
-    free(capsule->nl_constr_h_fun);
-    free(capsule->nl_constr_h_fun_jac_hess);
 
 
 
@@ -1216,7 +1137,7 @@ void planner_payload_acados_print_stats(planner_payload_solver_capsule* capsule)
         printf("stat_n_max = %d is too small, increase it in the template!\n", stat_n_max);
         exit(1);
     }
-    double stat[1616];
+    double stat[48];
     ocp_nlp_get(capsule->nlp_solver, "statistics", stat);
 
     int nrow = nlp_iter+1 < stat_m ? nlp_iter+1 : stat_m;

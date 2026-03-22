@@ -36,40 +36,49 @@ extern "C" {
 #endif
 
 
-/* explicit ODE */
+  
+// implicit ODE: function
+int planner_payload_impl_dae_fun(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_impl_dae_fun_work(int *, int *, int *, int *);
+const int *planner_payload_impl_dae_fun_sparsity_in(int);
+const int *planner_payload_impl_dae_fun_sparsity_out(int);
+int planner_payload_impl_dae_fun_n_in(void);
+int planner_payload_impl_dae_fun_n_out(void);
 
-// explicit ODE
-int planner_payload_expl_ode_fun(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
-int planner_payload_expl_ode_fun_work(int *, int *, int *, int *);
-const int *planner_payload_expl_ode_fun_sparsity_in(int);
-const int *planner_payload_expl_ode_fun_sparsity_out(int);
-int planner_payload_expl_ode_fun_n_in(void);
-int planner_payload_expl_ode_fun_n_out(void);
+// implicit ODE: function + jacobians
+int planner_payload_impl_dae_fun_jac_x_xdot_z(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_impl_dae_fun_jac_x_xdot_z_work(int *, int *, int *, int *);
+const int *planner_payload_impl_dae_fun_jac_x_xdot_z_sparsity_in(int);
+const int *planner_payload_impl_dae_fun_jac_x_xdot_z_sparsity_out(int);
+int planner_payload_impl_dae_fun_jac_x_xdot_z_n_in(void);
+int planner_payload_impl_dae_fun_jac_x_xdot_z_n_out(void);
 
-// explicit forward VDE
-int planner_payload_expl_vde_forw(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
-int planner_payload_expl_vde_forw_work(int *, int *, int *, int *);
-const int *planner_payload_expl_vde_forw_sparsity_in(int);
-const int *planner_payload_expl_vde_forw_sparsity_out(int);
-int planner_payload_expl_vde_forw_n_in(void);
-int planner_payload_expl_vde_forw_n_out(void);
+// implicit ODE: jacobians only
+int planner_payload_impl_dae_jac_x_xdot_u_z(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_impl_dae_jac_x_xdot_u_z_work(int *, int *, int *, int *);
+const int *planner_payload_impl_dae_jac_x_xdot_u_z_sparsity_in(int);
+const int *planner_payload_impl_dae_jac_x_xdot_u_z_sparsity_out(int);
+int planner_payload_impl_dae_jac_x_xdot_u_z_n_in(void);
+int planner_payload_impl_dae_jac_x_xdot_u_z_n_out(void);
 
-// explicit param-direction forward VDE
+// implicit ODE - for lifted_irk
+int planner_payload_impl_dae_fun_jac_x_xdot_u(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_impl_dae_fun_jac_x_xdot_u_work(int *, int *, int *, int *);
+const int *planner_payload_impl_dae_fun_jac_x_xdot_u_sparsity_in(int);
+const int *planner_payload_impl_dae_fun_jac_x_xdot_u_sparsity_out(int);
+int planner_payload_impl_dae_fun_jac_x_xdot_u_n_in(void);
+int planner_payload_impl_dae_fun_jac_x_xdot_u_n_out(void);
 
 
-// explicit adjoint VDE
-int planner_payload_expl_vde_adj(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
-int planner_payload_expl_vde_adj_work(int *, int *, int *, int *);
-const int *planner_payload_expl_vde_adj_sparsity_in(int);
-const int *planner_payload_expl_vde_adj_sparsity_out(int);
-int planner_payload_expl_vde_adj_n_in(void);
-int planner_payload_expl_vde_adj_n_out(void);
-int planner_payload_expl_ode_hess(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
-int planner_payload_expl_ode_hess_work(int *, int *, int *, int *);
-const int *planner_payload_expl_ode_hess_sparsity_in(int);
-const int *planner_payload_expl_ode_hess_sparsity_out(int);
-int planner_payload_expl_ode_hess_n_in(void);
-int planner_payload_expl_ode_hess_n_out(void);
+// implicit ODE - hessian
+int planner_payload_impl_dae_hess(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_impl_dae_hess_work(int *, int *, int *, int *);
+const int *planner_payload_impl_dae_hess_sparsity_in(int);
+const int *planner_payload_impl_dae_hess_sparsity_out(int);
+int planner_payload_impl_dae_hess_n_in(void);
+int planner_payload_impl_dae_hess_n_out(void);
+    
+  
 
 
 

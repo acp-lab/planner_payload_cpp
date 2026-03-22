@@ -46,7 +46,7 @@
 #define PLANNER_PAYLOAD_NBU    4
 #define PLANNER_PAYLOAD_NSBX   0
 #define PLANNER_PAYLOAD_NSBU   0
-#define PLANNER_PAYLOAD_NSH    1
+#define PLANNER_PAYLOAD_NSH    0
 #define PLANNER_PAYLOAD_NSH0   0
 #define PLANNER_PAYLOAD_NSG    0
 #define PLANNER_PAYLOAD_NSPHI  0
@@ -55,7 +55,7 @@
 #define PLANNER_PAYLOAD_NSPHIN 0
 #define PLANNER_PAYLOAD_NSPHI0 0
 #define PLANNER_PAYLOAD_NSBXN  0
-#define PLANNER_PAYLOAD_NS     1
+#define PLANNER_PAYLOAD_NS     0
 #define PLANNER_PAYLOAD_NS0    0
 #define PLANNER_PAYLOAD_NSN    0
 #define PLANNER_PAYLOAD_NG     0
@@ -65,7 +65,7 @@
 #define PLANNER_PAYLOAD_NY     0
 #define PLANNER_PAYLOAD_NYN    0
 #define PLANNER_PAYLOAD_N      51
-#define PLANNER_PAYLOAD_NH     1
+#define PLANNER_PAYLOAD_NH     0
 #define PLANNER_PAYLOAD_NHN    0
 #define PLANNER_PAYLOAD_NH0    0
 #define PLANNER_PAYLOAD_NPHI0  0
@@ -98,12 +98,12 @@ typedef struct planner_payload_solver_capsule
 
     // dynamics
 
-    external_function_external_param_casadi *expl_vde_forw;
-    external_function_external_param_casadi *expl_vde_forw_p;
-    external_function_external_param_casadi *expl_ode_fun;
-    external_function_external_param_casadi *expl_vde_adj;
+    external_function_external_param_casadi *impl_dae_fun;
+    external_function_external_param_casadi *impl_dae_fun_jac_x_xdot_z;
+    external_function_external_param_casadi *impl_dae_jac_x_xdot_u_z;
+    external_function_external_param_casadi *impl_dae_jac_p;
 
-    external_function_external_param_casadi *expl_ode_hess;
+    external_function_external_param_casadi *impl_dae_hess;
 
 
 
@@ -131,11 +131,6 @@ typedef struct planner_payload_solver_capsule
 
 
     // constraints
-    external_function_external_param_casadi *nl_constr_h_fun_jac;
-    external_function_external_param_casadi *nl_constr_h_fun;
-    external_function_external_param_casadi *nl_constr_h_fun_jac_hess;
-
-
 
 
 

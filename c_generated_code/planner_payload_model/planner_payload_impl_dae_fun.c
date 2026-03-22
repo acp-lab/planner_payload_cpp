@@ -29,12 +29,15 @@ extern "C" {
 #endif
 
 /* Add prefix to internal symbols */
+#define casadi_c0 CASADI_PREFIX(c0)
+#define casadi_copy CASADI_PREFIX(copy)
 #define casadi_f0 CASADI_PREFIX(f0)
 #define casadi_s0 CASADI_PREFIX(s0)
 #define casadi_s1 CASADI_PREFIX(s1)
 #define casadi_s2 CASADI_PREFIX(s2)
 #define casadi_s3 CASADI_PREFIX(s3)
 #define casadi_s4 CASADI_PREFIX(s4)
+#define casadi_zeros CASADI_PREFIX(zeros)
 
 /* Symbol visibility in DLLs */
 #ifndef CASADI_SYMBOL_EXPORT
@@ -51,14 +54,112 @@ extern "C" {
   #endif
 #endif
 
+void casadi_copy(const casadi_real* x, casadi_int n, casadi_real* y) {
+  casadi_int i;
+  if (y) {
+    if (x) {
+      for (i=0; i<n; ++i) *y++ = *x++;
+    } else {
+      for (i=0; i<n; ++i) *y++ = 0.;
+    }
+  }
+}
+
 static const casadi_int casadi_s0[3] = {12, 1, 1};
 static const casadi_int casadi_s1[3] = {4, 1, 1};
 static const casadi_int casadi_s2[3] = {0, 1, 1};
 static const casadi_int casadi_s3[3] = {0, 0, 1};
 static const casadi_int casadi_s4[3] = {44, 1, 1};
 
-/* planner_payload_impl_dae_fun:(i0[12],i1[12],i2[4],i3[0],i4[],i5[44])->(o0[]) */
+static const casadi_real casadi_c0[3] = {0., 0., 9.8100000000000005e+00};
+
+static const casadi_real casadi_zeros[12] = 
+  {0., 0., 0., 0., 0., 0., 0., 0.,
+  0., 0., 0., 0.};
+
+/* planner_payload_impl_dae_fun:(i0[12],i1[12],i2[4],i3[0],i4[],i5[44])->(o0[12]) */
 static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem) {
+  casadi_int i;
+  casadi_real *rr, *w00=w+0, w01, w02, w03, w04, w05, w06, w07, *w08=w+19, *w09=w+22, w10;
+  casadi_real w11, w12, *w13=w+28;
+  const casadi_real *cr, *cs, *wr00;
+  /* #0: @0 = input[1][0] */
+  wr00 = arg[1] ? arg[1] : casadi_zeros;
+  /* #1: @1 = input[0][3] */
+  w01 = arg[0] ? arg[0][3] : 0;
+  /* #2: @2 = input[0][4] */
+  w02 = arg[0] ? arg[0][4] : 0;
+  /* #3: @3 = input[0][5] */
+  w03 = arg[0] ? arg[0][5] : 0;
+  /* #4: @4 = -8.86525 */
+  w04 = -8.8652482269503547e+00;
+  /* #5: @5 = input[2][0] */
+  w05 = arg[2] ? arg[2][0] : 0;
+  /* #6: @4 = (@4*@5) */
+  w04 *= w05;
+  /* #7: @5 = input[0][6] */
+  w05 = arg[0] ? arg[0][6] : 0;
+  /* #8: @6 = input[0][7] */
+  w06 = arg[0] ? arg[0][7] : 0;
+  /* #9: @7 = input[0][8] */
+  w07 = arg[0] ? arg[0][8] : 0;
+  /* #10: @8 = vertcat(@5, @6, @7) */
+  rr=w08;
+  *rr++ = w05;
+  *rr++ = w06;
+  *rr++ = w07;
+  /* #11: @8 = (@4*@8) */
+  for (i=0, rr=w08, cs=w08; i<3; ++i) (*rr++)  = (w04*(*cs++));
+  /* #12: @9 = [0, 0, 9.81] */
+  casadi_copy(casadi_c0, 3, w09);
+  /* #13: @8 = (@8-@9) */
+  for (i=0, rr=w08, cs=w09; i<3; ++i) (*rr++) -= (*cs++);
+  /* #14: @4 = input[0][10] */
+  w04 = arg[0] ? arg[0][10] : 0;
+  /* #15: @10 = (@4*@7) */
+  w10  = (w04*w07);
+  /* #16: @11 = input[0][11] */
+  w11 = arg[0] ? arg[0][11] : 0;
+  /* #17: @12 = (@11*@6) */
+  w12  = (w11*w06);
+  /* #18: @10 = (@10-@12) */
+  w10 -= w12;
+  /* #19: @11 = (@11*@5) */
+  w11 *= w05;
+  /* #20: @12 = input[0][9] */
+  w12 = arg[0] ? arg[0][9] : 0;
+  /* #21: @7 = (@12*@7) */
+  w07  = (w12*w07);
+  /* #22: @11 = (@11-@7) */
+  w11 -= w07;
+  /* #23: @12 = (@12*@6) */
+  w12 *= w06;
+  /* #24: @4 = (@4*@5) */
+  w04 *= w05;
+  /* #25: @12 = (@12-@4) */
+  w12 -= w04;
+  /* #26: @4 = input[2][1] */
+  w04 = arg[2] ? arg[2][1] : 0;
+  /* #27: @5 = input[2][2] */
+  w05 = arg[2] ? arg[2][2] : 0;
+  /* #28: @6 = input[2][3] */
+  w06 = arg[2] ? arg[2][3] : 0;
+  /* #29: @13 = vertcat(@1, @2, @3, @8, @10, @11, @12, @4, @5, @6) */
+  rr=w13;
+  *rr++ = w01;
+  *rr++ = w02;
+  *rr++ = w03;
+  for (i=0, cs=w08; i<3; ++i) *rr++ = *cs++;
+  *rr++ = w10;
+  *rr++ = w11;
+  *rr++ = w12;
+  *rr++ = w04;
+  *rr++ = w05;
+  *rr++ = w06;
+  /* #30: @0 = (@0-@13) */
+  for (i=0, rr=w00, cr=wr00, cs=w13; i<12; ++i) (*rr++)  = ((*cr++)-(*cs++));
+  /* #31: output[0][0] = @0 */
+  casadi_copy(w00, 12, res[0]);
   return 0;
 }
 
@@ -133,24 +234,24 @@ CASADI_SYMBOL_EXPORT const casadi_int* planner_payload_impl_dae_fun_sparsity_in(
 
 CASADI_SYMBOL_EXPORT const casadi_int* planner_payload_impl_dae_fun_sparsity_out(casadi_int i) {
   switch (i) {
-    case 0: return casadi_s3;
+    case 0: return casadi_s0;
     default: return 0;
   }
 }
 
 CASADI_SYMBOL_EXPORT int planner_payload_impl_dae_fun_work(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w) {
-  if (sz_arg) *sz_arg = 6;
-  if (sz_res) *sz_res = 1;
+  if (sz_arg) *sz_arg = 16;
+  if (sz_res) *sz_res = 2;
   if (sz_iw) *sz_iw = 0;
-  if (sz_w) *sz_w = 0;
+  if (sz_w) *sz_w = 40;
   return 0;
 }
 
 CASADI_SYMBOL_EXPORT int planner_payload_impl_dae_fun_work_bytes(casadi_int *sz_arg, casadi_int* sz_res, casadi_int *sz_iw, casadi_int *sz_w) {
-  if (sz_arg) *sz_arg = 6*sizeof(const casadi_real*);
-  if (sz_res) *sz_res = 1*sizeof(casadi_real*);
+  if (sz_arg) *sz_arg = 16*sizeof(const casadi_real*);
+  if (sz_res) *sz_res = 2*sizeof(casadi_real*);
   if (sz_iw) *sz_iw = 0*sizeof(casadi_int);
-  if (sz_w) *sz_w = 0*sizeof(casadi_real);
+  if (sz_w) *sz_w = 40*sizeof(casadi_real);
   return 0;
 }
 

@@ -11,35 +11,53 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosS
 from geometry_msgs.msg import TransformStamped
 from tf2_ros import TransformBroadcaster
 from visualization_msgs.msg import Marker
+import yaml
+import os
+import sys
+
+def yaml_to_dict(path_to_yaml):
+  with open(path_to_yaml, 'r') as stream:
+    try:
+      parsed_yaml = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+      print(exc)
+  if '/**' in parsed_yaml:
+    parsed_yaml = parsed_yaml['/**']['ros__parameters']
+  return parsed_yaml
 
 class PayloadControlMujocoNode():
-    def __init__(self):
+    def __init__(self, params):
         self.weight_cable_direction = float(0.1)
-        self.weight_tension = float(200.0)
-        self.weight_rdot = float(100.0)
+        self.weight_tension = float(50.0)
+        self.weight_rdot = float(50.0)
         self.weight_orthogonality = float(0.1)
-        self.norm_constraint_slack_weight = float(0.1)
-        self.unit_vector_norm_tol = float(1e-3)
+        #self.norm_constraint_slack_weight = float(0.1)
+        #self.unit_vector_norm_tol = float(1e-3)
 
         # Time Definition
-        self.ts = float(0.05)
         self.final = 15
 
-        # Prediction Node of the NMPC formulation
-        self.t_N = float(2.5)
-        self.N = np.arange(0, self.t_N + self.ts, self.ts)
-        self.N_prediction = self.N.shape[0]
+        # Prediction nodes and nonuniform time grid for NMPC
+        self.t_N = params['nmpc']['horizon_time']
+        self.N_prediction = params['nmpc']['horizon_steps']
+
+        self.ts = self.t_N/self.N_prediction
+        #self.time_step_growth = 3.0  # Last step is ~3x the first before normalization.
+        #step_profile = np.linspace(1.0, self.time_step_growth, self.N_prediction)
+        #self.t_steps = self.t_N * step_profile / np.sum(step_profile)
+        #self.shooting_nodes = np.concatenate(([0.0], np.cumsum(self.t_steps)))
+        #self.ts = float(self.t_steps[0])
+        print("Check time parameters")
+        print(self.ts)
         print(self.N_prediction)
+        print(self.t_N)
+        #print(self.t_steps)
 
         # Internal parameters defintion
         self.robot_num = 1
-        self.mass = 0.11
-        self.gravity = 9.81
+        self.mass = params['mass_payload']
+        self.gravity = params['gravity']
 
-
-        # Quadrotor paramaters
-        self.mass_quad = 1.05
-        self.inertia_quad = np.array([[0.00345398, 0.0, 0.0], [0.0, 0.00179687, 0.0], [0.0, 0.0, 0.00179676]], dtype=np.double)
 
         # Control gains
         c1 = 1
@@ -49,8 +67,13 @@ class PayloadControlMujocoNode():
         self.c1 = c1
         
         # Cable length
-        self.length = 0.88
+        self.length = params['cable_length']
         self.e3 = ca.DM([0, 0, 1])
+
+        print("Check payload mass, gravity and cable length parameters")
+        print(self.mass)
+        print(self.gravity)
+        print(self.length)
 
         # Position of the system payload
         pos_0 = np.array([0.0, 0.0, 0.47], dtype=np.double)
@@ -86,7 +109,7 @@ class PayloadControlMujocoNode():
         print(self.u_equilibrium)
 
         # Maximum and minimun control actions
-        self.tension_min = 0.8*self.tensions_init
+        self.tension_min = 0.5*self.tensions_init
         self.tension_max = 10.0*self.tensions_init
 
         self.r_dot_max = np.array([10.0, 10.0, 10.0]*self.robot_num, dtype=np.double)
@@ -162,13 +185,21 @@ class PayloadControlMujocoNode():
         nx = x.shape[0]
         nu = u.shape[0]
 
+        x_dot = ca.MX.sym('x_dot', nx, 1)
+
+        f_implicit_expr = x_dot - f_expl
+
         ref_params = ca.MX.sym('ref_params', nx + nu, 1)
         cost_params = ca.MX.sym('cost_params', nx + nx + nu, 1)
 
         # Dynamics
         model = AcadosModel()
-        model.f_expl_expr = f_expl
         model.x = x
+        # acados_template expects `xdot`; keep both for compatibility across versions.
+        model.xdot = x_dot
+        model.x_dot = x_dot
+        model.f_expl_expr = f_expl
+        model.f_impl_expr = f_implicit_expr
         model.u = u
         model.p = ca.vertcat(ref_params, cost_params)
         model.name = model_name
@@ -235,13 +266,13 @@ class PayloadControlMujocoNode():
 
         ocp.model.cost_expr_ext_cost = (
             lyapunov_position
-            + self.weight_cable_direction * (error_n1.T @ error_n1)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
+            + self.weight_orthogonality * (orthogonality_error**2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
-            + self.weight_cable_direction * (error_n1.T @ error_n1)
+            + self.weight_orthogonality * (orthogonality_error**2)
         )
 
         ref_params = np.hstack((self.x_0, self.u_equilibrium))
@@ -257,39 +288,54 @@ class PayloadControlMujocoNode():
         ocp.constraints.x0 = x0
 
         # Softly enforce ||n1|| ~= 1 to improve robustness against numerical drift.
-        ocp.model.con_h_expr = ca.vertcat(ca.dot(n1, n1))
-        nh = 1
-        nsbx = 0
-        nsh = nh
-        ns = nsh + nsbx
-        ocp.cost.zl = self.norm_constraint_slack_weight * np.ones((ns, ))
-        ocp.cost.Zl = self.norm_constraint_slack_weight * np.ones((ns, ))
-        ocp.cost.zu = self.norm_constraint_slack_weight * np.ones((ns, ))
-        ocp.cost.Zu = self.norm_constraint_slack_weight * np.ones((ns, ))
-        ocp.constraints.lh = np.array([1.0 - self.unit_vector_norm_tol])
-        ocp.constraints.uh = np.array([1.0 + self.unit_vector_norm_tol])
-        ocp.constraints.lsh = np.zeros((nsh, ))
-        ocp.constraints.ush = np.zeros((nsh, ))
-        ocp.constraints.idxsh = np.array(range(nsh), dtype=np.int32)
+        #ocp.model.con_h_expr = ca.vertcat(ca.dot(n1, n1))
+        #nh = 1
+        #nsbx = 0
+        #nsh = nh
+        #ns = nsh + nsbx
+        #ocp.cost.zl = self.norm_constraint_slack_weight * np.ones((ns, ))
+        #ocp.cost.Zl = self.norm_constraint_slack_weight * np.ones((ns, ))
+        #ocp.cost.zu = self.norm_constraint_slack_weight * np.ones((ns, ))
+        #ocp.cost.Zu = self.norm_constraint_slack_weight * np.ones((ns, ))
+        #ocp.constraints.lh = np.array([1.0 - self.unit_vector_norm_tol])
+        #ocp.constraints.uh = np.array([1.0 + self.unit_vector_norm_tol])
+        #ocp.constraints.lsh = np.zeros((nsh, ))
+        #ocp.constraints.ush = np.zeros((nsh, ))
+        #ocp.constraints.idxsh = np.array(range(nsh), dtype=np.int32)
 
         ocp.solver_options.qp_solver = "FULL_CONDENSING_HPIPM" 
         ocp.solver_options.qp_solver_cond_N = self.N_prediction
-        ocp.solver_options.hessian_approx = "ECT"  
-        ocp.solver_options.integrator_type = "ERK"
+        ocp.solver_options.hessian_approx = "EXACT"  
+
+        ocp.solver_options.integrator_type = "IRK"
+        ocp.solver_options.sim_method_num_stages = 4  # IRK-GL4: 4 stages for accuracy
+        ocp.solver_options.sim_method_num_steps = 2  # Number of integration steps
+        ocp.solver_options.sim_method_newton_iter = 20  # Newton iterations for convergence
+        ocp.solver_options.sim_method_newton_tol = 1e-10  # Newton iterations for convergence
+
+        #ocp.solver_options.time_steps = self.t_steps
+        #ocp.solver_options.shooting_nodes = self.shooting_nodes
+        ocp.solver_options.levenberg_marquardt = 1e-6
+
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
+        ocp.solver_options.nlp_solver_max_iter = 2
         ocp.solver_options.Tsim = self.ts
         ocp.solver_options.tf = self.t_N
         ocp.solver_options.N_horizon = self.N_prediction
         ocp.solver_options.regularize_method = 'NO_REGULARIZE'  
-        ocp.solver_options.levenberg_marquardt = 10.0
+        #ocp.solver_options.levenberg_marquardt = 10.0
 
+        ocp.solver_options.timeout_max_time = 1*1e-3
+        ocp.solver_options.timeout_heuristic = "ZERO"
         return ocp
 
 
-def main():
-    payload_node = PayloadControlMujocoNode()
+def main(params):
+    payload_node = PayloadControlMujocoNode(params)
     return None
 
 if __name__ == '__main__':
-    main()
-
+    path_to_yaml = os.path.abspath(sys.argv[1])
+    params = yaml_to_dict(path_to_yaml)
+    print(params)
+    main(params)
