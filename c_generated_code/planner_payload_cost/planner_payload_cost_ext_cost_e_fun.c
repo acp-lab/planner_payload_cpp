@@ -30,13 +30,11 @@ extern "C" {
 
 /* Add prefix to internal symbols */
 #define casadi_copy CASADI_PREFIX(copy)
-#define casadi_dot CASADI_PREFIX(dot)
 #define casadi_f0 CASADI_PREFIX(f0)
 #define casadi_s0 CASADI_PREFIX(s0)
 #define casadi_s1 CASADI_PREFIX(s1)
 #define casadi_s2 CASADI_PREFIX(s2)
 #define casadi_s3 CASADI_PREFIX(s3)
-#define casadi_sq CASADI_PREFIX(sq)
 #define casadi_zeros CASADI_PREFIX(zeros)
 
 /* Symbol visibility in DLLs */
@@ -64,15 +62,6 @@ void casadi_copy(const casadi_real* x, casadi_int n, casadi_real* y) {
     }
   }
 }
-
-casadi_real casadi_dot(casadi_int n, const casadi_real* x, const casadi_real* y) {
-  casadi_int i;
-  casadi_real r = 0;
-  for (i=0; i<n; ++i) r += *x++ * *y++;
-  return r;
-}
-
-casadi_real casadi_sq(casadi_real x) { return x*x;}
 
 static const casadi_int casadi_s0[3] = {12, 1, 1};
 static const casadi_int casadi_s1[3] = {0, 1, 1};
@@ -202,21 +191,7 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   w02 *= w00;
   /* #47: @1 = (@1+@2) */
   w01 += w02;
-  /* #48: @2 = 10 */
-  w02 = 10.;
-  /* #49: @17 = @14[6:9] */
-  for (rr=w17, cs=w14+6; cs!=w14+9; cs+=1) *rr++ = *cs;
-  /* #50: @15 = @14[9:12] */
-  for (rr=w15, cs=w14+9; cs!=w14+12; cs+=1) *rr++ = *cs;
-  /* #51: @0 = dot(@17, @15) */
-  w00 = casadi_dot(3, w17, w15);
-  /* #52: @0 = sq(@0) */
-  w00 = casadi_sq( w00 );
-  /* #53: @2 = (@2*@0) */
-  w02 *= w00;
-  /* #54: @1 = (@1+@2) */
-  w01 += w02;
-  /* #55: output[0][0] = @1 */
+  /* #48: output[0][0] = @1 */
   if (res[0]) res[0][0] = w01;
   return 0;
 }

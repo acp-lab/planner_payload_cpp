@@ -61,6 +61,12 @@ int planner_payload_constr_h_fun_n_out(void);
 
 
 
+int planner_payload_constr_h_fun_jac_uxt_zt_hess(const real_t** arg, real_t** res, int* iw, real_t* w, void *mem);
+int planner_payload_constr_h_fun_jac_uxt_zt_hess_work(int *, int *, int *, int *);
+const int *planner_payload_constr_h_fun_jac_uxt_zt_hess_sparsity_in(int);
+const int *planner_payload_constr_h_fun_jac_uxt_zt_hess_sparsity_out(int);
+int planner_payload_constr_h_fun_jac_uxt_zt_hess_n_in(void);
+int planner_payload_constr_h_fun_jac_uxt_zt_hess_n_out(void);
 
 
 

@@ -15,10 +15,10 @@ from visualization_msgs.msg import Marker
 class PayloadControlMujocoNode():
     def __init__(self):
         self.weight_cable_direction = float(0.1)
-        self.weight_tension = float(20.0)
-        self.weight_rdot = float(20.0)
-        self.weight_orthogonality = float(10.0)
-        self.norm_constraint_slack_weight = float(100.0)
+        self.weight_tension = float(200.0)
+        self.weight_rdot = float(100.0)
+        self.weight_orthogonality = float(0.1)
+        self.norm_constraint_slack_weight = float(0.1)
         self.unit_vector_norm_tol = float(1e-3)
 
         # Time Definition
@@ -238,12 +238,10 @@ class PayloadControlMujocoNode():
             + self.weight_cable_direction * (error_n1.T @ error_n1)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
-            + self.weight_orthogonality * (orthogonality_error**2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
             + self.weight_cable_direction * (error_n1.T @ error_n1)
-            + self.weight_orthogonality * (orthogonality_error**2)
         )
 
         ref_params = np.hstack((self.x_0, self.u_equilibrium))
@@ -276,7 +274,7 @@ class PayloadControlMujocoNode():
 
         ocp.solver_options.qp_solver = "FULL_CONDENSING_HPIPM" 
         ocp.solver_options.qp_solver_cond_N = self.N_prediction
-        ocp.solver_options.hessian_approx = "GAUSS_NEWTON"  
+        ocp.solver_options.hessian_approx = "ECT"  
         ocp.solver_options.integrator_type = "ERK"
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
         ocp.solver_options.Tsim = self.ts

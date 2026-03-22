@@ -103,6 +103,7 @@ typedef struct planner_payload_solver_capsule
     external_function_external_param_casadi *expl_ode_fun;
     external_function_external_param_casadi *expl_vde_adj;
 
+    external_function_external_param_casadi *expl_ode_hess;
 
 
 
@@ -132,6 +133,7 @@ typedef struct planner_payload_solver_capsule
     // constraints
     external_function_external_param_casadi *nl_constr_h_fun_jac;
     external_function_external_param_casadi *nl_constr_h_fun;
+    external_function_external_param_casadi *nl_constr_h_fun_jac_hess;
 
 
 

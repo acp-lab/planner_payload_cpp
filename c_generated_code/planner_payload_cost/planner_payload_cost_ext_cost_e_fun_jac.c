@@ -31,13 +31,11 @@ extern "C" {
 /* Add prefix to internal symbols */
 #define casadi_clear CASADI_PREFIX(clear)
 #define casadi_copy CASADI_PREFIX(copy)
-#define casadi_dot CASADI_PREFIX(dot)
 #define casadi_f0 CASADI_PREFIX(f0)
 #define casadi_s0 CASADI_PREFIX(s0)
 #define casadi_s1 CASADI_PREFIX(s1)
 #define casadi_s2 CASADI_PREFIX(s2)
 #define casadi_s3 CASADI_PREFIX(s3)
-#define casadi_sq CASADI_PREFIX(sq)
 #define casadi_zeros CASADI_PREFIX(zeros)
 
 /* Symbol visibility in DLLs */
@@ -66,15 +64,6 @@ void casadi_copy(const casadi_real* x, casadi_int n, casadi_real* y) {
   }
 }
 
-casadi_real casadi_dot(casadi_int n, const casadi_real* x, const casadi_real* y) {
-  casadi_int i;
-  casadi_real r = 0;
-  for (i=0; i<n; ++i) r += *x++ * *y++;
-  return r;
-}
-
-casadi_real casadi_sq(casadi_real x) { return x*x;}
-
 void casadi_clear(casadi_real* x, casadi_int n) {
   casadi_int i;
   if (x) {
@@ -95,7 +84,7 @@ static const casadi_real casadi_zeros[16] =
 static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem) {
   casadi_int i, j, k;
   casadi_real *rr, w00, w01, w02, w03, w04, w05, w06, w07, w08, w09, w10;
-  casadi_real w11, w12, w13, *w14=w+15, *w15=w+27, *w17=w+46, *w18=w+49, *w19=w+52, *w20=w+55, *w21=w+58, w22, w23;
+  casadi_real w11, w12, w13, *w14=w+15, *w15=w+27, *w17=w+46, *w18=w+49, *w19=w+52, w20, w21;
   const casadi_real *cs, *ct, *wr16, *wr17, *wr18;
   /* #0: @0 = 0 */
   w00 = 0.;
@@ -210,50 +199,24 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   w00  = (w02*w00);
   /* #47: @1 = (@1+@0) */
   w01 += w00;
-  /* #48: @0 = 10 */
-  w00 = 10.;
-  /* #49: @20 = @14[6:9] */
-  for (rr=w20, cs=w14+6; cs!=w14+9; cs+=1) *rr++ = *cs;
-  /* #50: @21 = @14[9:12] */
-  for (rr=w21, cs=w14+9; cs!=w14+12; cs+=1) *rr++ = *cs;
-  /* #51: @4 = dot(@20, @21) */
-  w04 = casadi_dot(3, w20, w21);
-  /* #52: @6 = sq(@4) */
-  w06 = casadi_sq( w04 );
-  /* #53: @6 = (@0*@6) */
-  w06  = (w00*w06);
-  /* #54: @1 = (@1+@6) */
-  w01 += w06;
-  /* #55: output[0][0] = @1 */
+  /* #48: output[0][0] = @1 */
   if (res[0]) res[0][0] = w01;
-  /* #56: @14 = zeros(12x1) */
+  /* #49: @14 = zeros(12x1) */
   casadi_clear(w14, 12);
-  /* #57: @4 = (2.*@4) */
-  w04 = (2.* w04 );
-  /* #58: @0 = (@0*@4) */
-  w00 *= w04;
-  /* #59: @20 = (@0*@20) */
-  for (i=0, rr=w20, cs=w20; i<3; ++i) (*rr++)  = (w00*(*cs++));
-  /* #60: (@14[9:12] += @20) */
-  for (rr=w14+9, cs=w20; rr!=w14+12; rr+=1) *rr += *cs++;
-  /* #61: @21 = (@0*@21) */
-  for (i=0, rr=w21, cs=w21; i<3; ++i) (*rr++)  = (w00*(*cs++));
-  /* #62: (@14[6:9] += @21) */
-  for (rr=w14+6, cs=w21; rr!=w14+9; rr+=1) *rr += *cs++;
-  /* #63: @18 = @18' */
-  /* #64: @18 = (2.*@18) */
+  /* #50: @18 = @18' */
+  /* #51: @18 = (2.*@18) */
   for (i=0, rr=w18, cs=w18; i<3; ++i) *rr++ = (2.* *cs++ );
-  /* #65: (@14[3:6] += @18) */
+  /* #52: (@14[3:6] += @18) */
   for (rr=w14+3, cs=w18; rr!=w14+6; rr+=1) *rr += *cs++;
-  /* #66: @17 = @17' */
-  /* #67: @17 = (2.*@17) */
+  /* #53: @17 = @17' */
+  /* #54: @17 = (2.*@17) */
   for (i=0, rr=w17, cs=w17; i<3; ++i) *rr++ = (2.* *cs++ );
-  /* #68: (@14[:3] += @17) */
+  /* #55: (@14[:3] += @17) */
   for (rr=w14+0, cs=w17; rr!=w14+3; rr+=1) *rr += *cs++;
-  /* #69: {@0, @4, @1, @6, @9, @8, @10, @11, @12, @13, @22, @23} = vertsplit(@14) */
-  w00 = w14[0];
-  w04 = w14[1];
-  w01 = w14[2];
+  /* #56: {@1, @0, @4, @6, @9, @8, @10, @11, @12, @13, @20, @21} = vertsplit(@14) */
+  w01 = w14[0];
+  w00 = w14[1];
+  w04 = w14[2];
   w06 = w14[3];
   w09 = w14[4];
   w08 = w14[5];
@@ -261,67 +224,67 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   w11 = w14[7];
   w12 = w14[8];
   w13 = w14[9];
-  w22 = w14[10];
-  w23 = w14[11];
-  /* #70: output[1][0] = @0 */
-  if (res[1]) res[1][0] = w00;
-  /* #71: output[1][1] = @4 */
-  if (res[1]) res[1][1] = w04;
-  /* #72: output[1][2] = @1 */
-  if (res[1]) res[1][2] = w01;
-  /* #73: output[1][3] = @6 */
+  w20 = w14[10];
+  w21 = w14[11];
+  /* #57: output[1][0] = @1 */
+  if (res[1]) res[1][0] = w01;
+  /* #58: output[1][1] = @0 */
+  if (res[1]) res[1][1] = w00;
+  /* #59: output[1][2] = @4 */
+  if (res[1]) res[1][2] = w04;
+  /* #60: output[1][3] = @6 */
   if (res[1]) res[1][3] = w06;
-  /* #74: output[1][4] = @9 */
+  /* #61: output[1][4] = @9 */
   if (res[1]) res[1][4] = w09;
-  /* #75: output[1][5] = @8 */
+  /* #62: output[1][5] = @8 */
   if (res[1]) res[1][5] = w08;
-  /* #76: @15 = (@2*@15) */
+  /* #63: @15 = (@2*@15) */
   for (i=0, rr=w15, cs=w15; i<3; ++i) (*rr++)  = (w02*(*cs++));
-  /* #77: @19 = (@2*@19) */
+  /* #64: @19 = (@2*@19) */
   for (i=0, rr=w19, cs=w19; i<3; ++i) (*rr++)  = (w02*(*cs++));
-  /* #78: @19 = @19' */
-  /* #79: @15 = (@15+@19) */
+  /* #65: @19 = @19' */
+  /* #66: @15 = (@15+@19) */
   for (i=0, rr=w15, cs=w19; i<3; ++i) (*rr++) += (*cs++);
-  /* #80: {@2, @8, @9} = vertsplit(@15) */
+  /* #67: {@2, @8, @9} = vertsplit(@15) */
   w02 = w15[0];
   w08 = w15[1];
   w09 = w15[2];
-  /* #81: @6 = (@5*@8) */
+  /* #68: @6 = (@5*@8) */
   w06  = (w05*w08);
-  /* #82: @1 = (@3*@9) */
-  w01  = (w03*w09);
-  /* #83: @6 = (@6-@1) */
-  w06 -= w01;
-  /* #84: @6 = (@6+@10) */
+  /* #69: @4 = (@3*@9) */
+  w04  = (w03*w09);
+  /* #70: @6 = (@6-@4) */
+  w06 -= w04;
+  /* #71: @6 = (@6+@10) */
   w06 += w10;
-  /* #85: output[1][6] = @6 */
+  /* #72: output[1][6] = @6 */
   if (res[1]) res[1][6] = w06;
-  /* #86: @9 = (@7*@9) */
+  /* #73: @9 = (@7*@9) */
   w09  = (w07*w09);
-  /* #87: @5 = (@5*@2) */
+  /* #74: @5 = (@5*@2) */
   w05 *= w02;
-  /* #88: @9 = (@9-@5) */
+  /* #75: @9 = (@9-@5) */
   w09 -= w05;
-  /* #89: @9 = (@9+@11) */
+  /* #76: @9 = (@9+@11) */
   w09 += w11;
-  /* #90: output[1][7] = @9 */
+  /* #77: output[1][7] = @9 */
   if (res[1]) res[1][7] = w09;
-  /* #91: @3 = (@3*@2) */
+  /* #78: @3 = (@3*@2) */
   w03 *= w02;
-  /* #92: @7 = (@7*@8) */
+  /* #79: @7 = (@7*@8) */
   w07 *= w08;
-  /* #93: @3 = (@3-@7) */
+  /* #80: @3 = (@3-@7) */
   w03 -= w07;
-  /* #94: @3 = (@3+@12) */
+  /* #81: @3 = (@3+@12) */
   w03 += w12;
-  /* #95: output[1][8] = @3 */
+  /* #82: output[1][8] = @3 */
   if (res[1]) res[1][8] = w03;
-  /* #96: output[1][9] = @13 */
+  /* #83: output[1][9] = @13 */
   if (res[1]) res[1][9] = w13;
-  /* #97: output[1][10] = @22 */
-  if (res[1]) res[1][10] = w22;
-  /* #98: output[1][11] = @23 */
-  if (res[1]) res[1][11] = w23;
+  /* #84: output[1][10] = @20 */
+  if (res[1]) res[1][10] = w20;
+  /* #85: output[1][11] = @21 */
+  if (res[1]) res[1][11] = w21;
   return 0;
 }
 
@@ -403,7 +366,7 @@ CASADI_SYMBOL_EXPORT int planner_payload_cost_ext_cost_e_fun_jac_work(casadi_int
   if (sz_arg) *sz_arg = 16;
   if (sz_res) *sz_res = 14;
   if (sz_iw) *sz_iw = 0;
-  if (sz_w) *sz_w = 63;
+  if (sz_w) *sz_w = 57;
   return 0;
 }
 
@@ -411,7 +374,7 @@ CASADI_SYMBOL_EXPORT int planner_payload_cost_ext_cost_e_fun_jac_work_bytes(casa
   if (sz_arg) *sz_arg = 16*sizeof(const casadi_real*);
   if (sz_res) *sz_res = 14*sizeof(casadi_real*);
   if (sz_iw) *sz_iw = 0*sizeof(casadi_int);
-  if (sz_w) *sz_w = 63*sizeof(casadi_real);
+  if (sz_w) *sz_w = 57*sizeof(casadi_real);
   return 0;
 }
 

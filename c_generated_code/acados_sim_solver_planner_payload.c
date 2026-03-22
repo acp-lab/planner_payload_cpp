@@ -115,6 +115,14 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
     external_function_param_casadi_create(capsule->sim_expl_ode_fun_casadi, np, &ext_fun_opts);
 
     
+    capsule->sim_expl_ode_hess = (external_function_param_casadi *) malloc(sizeof(external_function_param_casadi));
+    capsule->sim_expl_ode_hess->casadi_fun = &planner_payload_expl_ode_hess;
+    capsule->sim_expl_ode_hess->casadi_work = &planner_payload_expl_ode_hess_work;
+    capsule->sim_expl_ode_hess->casadi_sparsity_in = &planner_payload_expl_ode_hess_sparsity_in;
+    capsule->sim_expl_ode_hess->casadi_sparsity_out = &planner_payload_expl_ode_hess_sparsity_out;
+    capsule->sim_expl_ode_hess->casadi_n_in = &planner_payload_expl_ode_hess_n_in;
+    capsule->sim_expl_ode_hess->casadi_n_out = &planner_payload_expl_ode_hess_n_out;
+    external_function_param_casadi_create(capsule->sim_expl_ode_hess, np, &ext_fun_opts);
 
     
 
@@ -171,6 +179,8 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
     planner_payload_sim_config->model_set(planner_payload_sim_in->model,
                  "expl_ode_fun", capsule->sim_expl_ode_fun_casadi);
     
+    planner_payload_sim_config->model_set(planner_payload_sim_in->model,
+                "expl_ode_hess", capsule->sim_expl_ode_hess);
 
     // sim solver
     sim_solver *planner_payload_sim_solver = sim_solver_create(planner_payload_sim_config,
@@ -287,6 +297,8 @@ int planner_payload_acados_sim_free(planner_payload_sim_solver_capsule *capsule)
     free(capsule->sim_vde_adj_casadi);
     free(capsule->sim_expl_ode_fun_casadi);
     
+    external_function_param_casadi_free(capsule->sim_expl_ode_hess);
+    free(capsule->sim_expl_ode_hess);
 
     return 0;
 }
@@ -306,6 +318,7 @@ int planner_payload_acados_sim_update_params(planner_payload_sim_solver_capsule 
     capsule->sim_vde_adj_casadi[0].set_param(capsule->sim_vde_adj_casadi, p);
     capsule->sim_expl_ode_fun_casadi[0].set_param(capsule->sim_expl_ode_fun_casadi, p);
     
+    capsule->sim_expl_ode_hess[0].set_param(capsule->sim_expl_ode_hess, p);
 
     return status;
 }

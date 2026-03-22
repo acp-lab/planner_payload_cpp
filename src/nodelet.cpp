@@ -18,13 +18,13 @@ public:
         enable_motors_(false), _optimization_error(false), _aux_initial(false),
         set_pre_odom_quat_(false) {
 
-    this->declare_parameter("mass", 0.11);
+    this->declare_parameter("mass_payload", 0.1128);
     this->declare_parameter("gravity", 9.81);
-    this->declare_parameter("length", 0.88);
+    this->declare_parameter("cable_length", 0.88);
 
-    logParameter("mass", mass_, "%.4f");
+    logParameter("mass_payload", mass_payload_, "%.4f");
     logParameter("gravity", gravity_, "%.4f");
-    logParameter("length", length_, "%.4f");
+    logParameter("cable_length", cable_length_, "%.4f");
 
     inertia_matrix_ = Eigen::Matrix3d::Zero();
 
@@ -52,11 +52,11 @@ public:
     rclcpp::Parameter Q_e_param = this->get_parameter("nmpc.Q_e");
     rclcpp::Parameter R_param = this->get_parameter("nmpc.R");
 
-    RCLCPP_INFO(this->get_logger(), "[NMPC] Q: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q: %s",
                 Q_param.value_to_string().c_str());
-    RCLCPP_INFO(this->get_logger(), "[NMPC] Q_e: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q_e: %s",
                 Q_e_param.value_to_string().c_str());
-    RCLCPP_INFO(this->get_logger(), "[NMPC] R: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] R: %s",
                 R_param.value_to_string().c_str());
 
     Q_param_ = Q_param.as_double_array();
@@ -65,7 +65,7 @@ public:
 
     clock_ = rclcpp::Clock();
 
-    controller_.setMass(mass_);
+    controller_.setMass(mass_payload_);
     controller_.setGravity(gravity_);
     controller_.setWeightMatrices(Q_param_, Q_e_param_, R_param_);
 
@@ -74,33 +74,33 @@ public:
 
     // Publish payload desired and predictions
     pub_ref_traj_ = this->create_publisher<nav_msgs::msg::Path>(
-        "quadrotor/payload_reference_path", 1);
+        "/quadrotor/payload_reference_path", 1);
 
     pub_pred_traj_ = this->create_publisher<nav_msgs::msg::Path>(
-        "quadrotor/payload_predicted_path", 1);
+        "/quadrotor/payload_predicted_path", 1);
 
     // Publish quadrotor desired
     pub_desired_quadrotor_ =
         this->create_publisher<quadrotor_msgs::msg::PositionCommand>(
-            "quadrotor/payload_planner_quadrotor_cmd", 1);
+            "/quadrotor/payload_planner_quadrotor_cmd", 1);
 
     // Subscribers
     sub_payload_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "quadrotor/payload/odom", qos_profile,
+        "/quadrotor/payload/odom", qos_profile,
         std::bind(&NMPCControlNodelet::payloadOdomCallback, this,
                   std::placeholders::_1));
     sub_quad_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "quadrotor/odom", qos_profile,
+        "/quadrotor/odom", qos_profile,
         std::bind(&NMPCControlNodelet::quadOdomCallback, this,
                   std::placeholders::_1));
     sub_position_cmd_ =
         this->create_subscription<quadrotor_msgs::msg::PositionCommand>(
-            "quadrotor/position_cmd", 1,
+            "/quadrotor/position_cmd", 1,
             std::bind(&NMPCControlNodelet::referenceCallback, this,
                       std::placeholders::_1));
 
     srv_activate_payload_ = this->create_service<std_srvs::srv::SetBool>(
-        "quadrotor/activate_payload_nmpc_controller",
+        "/quadrotor/activate_payload_nmpc_controller",
         std::bind(&NMPCControlNodelet::activate_payload_callback, this,
                   std::placeholders::_1, std::placeholders::_2));
   }
@@ -111,15 +111,17 @@ private:
   void logParameter(const std::string &param_name, T &param_value,
                     const std::string &format) {
     if (!this->get_parameter(param_name, param_value)) {
-      RCLCPP_ERROR(this->get_logger(), "[NMPC] No %s!", param_name.c_str());
+      RCLCPP_ERROR(this->get_logger(), "[NMPC Payload Planner] No %s!",
+                   param_name.c_str());
     } else {
       if constexpr (std::is_same_v<T, std::string>) {
-        RCLCPP_INFO(this->get_logger(), "[NMPC] %s: %s", param_name.c_str(),
-                    param_value.c_str());
+        RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] %s: %s",
+                    param_name.c_str(), param_value.c_str());
       } else {
-        RCLCPP_INFO(this->get_logger(),
-                    ("[NMPC] " + param_name + ": " + format).c_str(),
-                    param_value);
+        RCLCPP_INFO(
+            this->get_logger(),
+            ("[NMPC Payload Planner] " + param_name + ": " + format).c_str(),
+            param_value);
       }
     }
   }
@@ -136,9 +138,9 @@ private:
   bool set_pre_odom_quat_;
 
   // from param server
-  double mass_;
+  double mass_payload_;
   double gravity_;
-  double length_;
+  double cable_length_;
 
   Eigen::Matrix4d mixer_matrix_inv_;
   Eigen::Matrix3d inertia_matrix_;
@@ -150,8 +152,6 @@ private:
 
   Eigen::Vector3d quad_position_{Eigen::Vector3d::Zero()};
   Eigen::Vector3d quad_velocity_{Eigen::Vector3d::Zero()};
-  bool has_quad_odom_{false};
-  bool has_reference_{false};
   bool use_nmpc_payload_{false};
 
   void payloadOdomCallback(const nav_msgs::msg::Odometry::SharedPtr odom_msg);
@@ -201,7 +201,6 @@ void NMPCControlNodelet::quadOdomCallback(
       odom_msg->pose.pose.position.y, odom_msg->pose.pose.position.z;
   quad_velocity_ << odom_msg->twist.twist.linear.x,
       odom_msg->twist.twist.linear.y, odom_msg->twist.twist.linear.z;
-  has_quad_odom_ = true;
 }
 
 void NMPCControlNodelet::activate_payload_callback(
@@ -209,8 +208,8 @@ void NMPCControlNodelet::activate_payload_callback(
     std::shared_ptr<std_srvs::srv::SetBool::Response> response) {
   use_nmpc_payload_ = request->data;
   response->success = true;
-  response->message =
-      use_nmpc_payload_ ? "Payload NMPC active" : "Standard TRPY active";
+  response->message = use_nmpc_payload_ ? "Payload NMPC Planner active"
+                                        : "Standard TRPY active";
   RCLCPP_INFO(this->get_logger(), "Switching controller mode: %s",
               response->message.c_str());
 }
@@ -230,24 +229,19 @@ void NMPCControlNodelet::payloadOdomCallback(
 
   Eigen::Vector3d cable_dir(0.0, 0.0, -1.0);
   Eigen::Vector3d cable_r(0.0, 0.0, 0.0);
-  if (has_quad_odom_) {
-    const Eigen::Vector3d payload_position = state.segment<3>(0);
-    const Eigen::Vector3d payload_velocity = state.segment<3>(3);
-    const Eigen::Vector3d a = payload_position - quad_position_;
-    const Eigen::Vector3d a_dot = payload_velocity - quad_velocity_;
-    const double norm_a = a.norm();
-    const double dot_a = a.dot(a);
-    const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
-    const Eigen::Matrix3d projection = I - (a * a.transpose()) / dot_a;
-    const Eigen::Vector3d n_dot = (1.0 / norm_a) * projection * a_dot;
 
-    cable_dir = a / norm_a;
-    cable_r = cable_dir.cross(n_dot);
-  } else {
-    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                         "[NMPC] Waiting for quadrotor odometry; using default "
-                         "cable direction.");
-  }
+  const Eigen::Vector3d payload_position = state.segment<3>(0);
+  const Eigen::Vector3d payload_velocity = state.segment<3>(3);
+  const Eigen::Vector3d a = payload_position - quad_position_;
+  const Eigen::Vector3d a_dot = payload_velocity - quad_velocity_;
+  const double norm_a = a.norm();
+  const double dot_a = a.dot(a);
+  const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
+  const Eigen::Matrix3d projection = I - (a * a.transpose()) / dot_a;
+  const Eigen::Vector3d n_dot = (1.0 / norm_a) * projection * a_dot;
+
+  cable_dir = a / norm_a;
+  cable_r = cable_dir.cross(n_dot);
 
   state.segment<3>(6) = cable_dir;
   state.segment<3>(9) = cable_r;
@@ -267,7 +261,7 @@ void NMPCControlNodelet::referenceCallback(
 
   const Eigen::Vector3d n_eq(0.0, 0.0, -1.0);
   const Eigen::Vector3d r_eq(0.0, 0.0, 0.0);
-  const double thrust_eq = mass_ * gravity_;
+  const double thrust_eq = mass_payload_ * gravity_;
 
   const size_t n_points = reference_msg->points.size();
 
@@ -289,6 +283,8 @@ void NMPCControlNodelet::referenceCallback(
       reference_inputs(2, i) = 0.0;
       reference_inputs(3, i) = 0.0;
     }
+    RCLCPP_WARN_THROTTLE(this->get_logger(), clock_, 1000,
+                         "[PayloadOlanner] Obtaining only one point reference");
   } else {
     for (int i = 0; i < kSamples; ++i) {
       const size_t idx = std::min(static_cast<size_t>(i), n_points - 1U);
@@ -313,18 +309,14 @@ void NMPCControlNodelet::referenceCallback(
     }
   }
 
-  RCLCPP_WARN_THROTTLE(this->get_logger(), clock_, 1000,
-                       "[PayloadOlanner] Checking length desired path. %i",
-                       number_iterations);
   controller_.setReferenceStates(reference_states);
   controller_.setReferenceInputs(reference_inputs);
-  has_reference_ = true;
   if (use_nmpc_payload_) {
     run();
   } else {
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                         "[NMPC] Waiting to switch to payload planner "
-                         "(/quadrotor/activate_payload_nmpc_controller).");
+    RCLCPP_INFO_THROTTLE(
+        this->get_logger(), *this->get_clock(), 5000,
+        "[NMPC Payload Planner] Waiting to switch to payload planner ");
   }
 }
 
@@ -334,24 +326,28 @@ void NMPCControlNodelet::run() {
   switch (acados_status) {
   case 1:
     if (_aux_initial) {
-      RCLCPP_WARN(this->get_logger(),
-                  "[NMPC] acados failure: could not find a solution.");
+      RCLCPP_WARN(
+          this->get_logger(),
+          "[NMPC Payload Planner] acados failure: could not find a solution.");
       _optimization_error = true;
       return;
     }
     break;
   case 2:
-    RCLCPP_WARN(this->get_logger(),
-                "[NMPC] acados maxiter: maximum iterations reached.");
+    RCLCPP_WARN(
+        this->get_logger(),
+        "[NMPC Payload Planner] acados maxiter: maximum iterations reached.");
     _optimization_error = true;
     return;
   case 3:
-    RCLCPP_WARN(this->get_logger(),
-                "[NMPC] acados minstep: minimum QP step reached.");
+    RCLCPP_WARN(
+        this->get_logger(),
+        "[NMPC Payload Planner] acados minstep: minimum QP step reached.");
     _optimization_error = true;
     return;
   case 4:
-    RCLCPP_WARN(this->get_logger(), "[NMPC] acados qp failure.");
+    RCLCPP_WARN(this->get_logger(),
+                "[NMPC Payload Planner] acados qp failure.");
     _optimization_error = true;
     return;
   default:
@@ -364,7 +360,8 @@ void NMPCControlNodelet::run() {
       controller_.getPredictedInput();
 
   if (!pred_state.allFinite() || !pred_input.allFinite()) {
-    RCLCPP_WARN(this->get_logger(), "[NMPC] NaN/Inf in current solution.");
+    RCLCPP_WARN(this->get_logger(),
+                "[NMPC Payload Planner] NaN/Inf in current solution.");
     _optimization_error = true;
     _aux_initial = true;
     return;
@@ -480,7 +477,7 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
         quadrotorAccelerationFromPayloadStateInput(state_i, input_i);
 
     const double thrust_i = input_i(0);
-    const double safe_mass = std::max(std::abs(mass_), 1e-6);
+    const double safe_mass = std::max(std::abs(mass_payload_), 1e-6);
     const Eigen::Vector3d e3(0.0, 0.0, 1.0);
 
     quadrotor_msgs::msg::TrajectoryPoint point;
@@ -507,7 +504,7 @@ Eigen::Vector3d NMPCControlNodelet::quadrotorPositionFromPayloadState(
     const Eigen::Ref<const Eigen::Matrix<double, kStateSize, 1>> &state) const {
   const Eigen::Vector3d payload_position = state.segment<3>(0);
   const Eigen::Vector3d cable_direction = state.segment<3>(6);
-  return payload_position - (length_ * cable_direction);
+  return payload_position - (cable_length_ * cable_direction);
 }
 
 Eigen::Vector3d NMPCControlNodelet::quadrotorVelocityFromPayloadState(
@@ -516,7 +513,7 @@ Eigen::Vector3d NMPCControlNodelet::quadrotorVelocityFromPayloadState(
   const Eigen::Vector3d cable_direction = state.segment<3>(6);
   const Eigen::Vector3d cable_angular_velocity = state.segment<3>(9);
   return payload_velocity -
-         length_ * cable_angular_velocity.cross(cable_direction);
+         cable_length_ * cable_angular_velocity.cross(cable_direction);
 }
 
 Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadStateInput(
@@ -527,16 +524,16 @@ Eigen::Vector3d NMPCControlNodelet::quadrotorAccelerationFromPayloadStateInput(
   const double thrust_command = input(0);
   const Eigen::Vector3d cable_angular_acceleration_input = input.segment<3>(1);
 
-  const double safe_mass = mass_;
+  const double safe_mass = mass_payload_;
   const Eigen::Vector3d e3(0.0, 0.0, 1.0);
   const Eigen::Vector3d payload_linear_acceleration =
       -(thrust_command / safe_mass) * cable_direction - gravity_ * e3;
   const Eigen::Vector3d input_angular_acc_cable =
-      -length_ * cable_angular_acceleration_input.cross(cable_direction);
+      -cable_length_ * cable_angular_acceleration_input.cross(cable_direction);
   const Eigen::Vector3d cable_angular_velocity_aux =
       cable_angular_velocity.cross(cable_direction);
   const Eigen::Vector3d angular_velocity_cable =
-      -length_ * cable_angular_velocity.cross(cable_angular_velocity_aux);
+      -cable_length_ * cable_angular_velocity.cross(cable_angular_velocity_aux);
   return payload_linear_acceleration + input_angular_acc_cable +
          angular_velocity_cable;
 }
