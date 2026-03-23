@@ -363,10 +363,6 @@ void planner_payload_acados_create_setup_functions(planner_payload_solver_capsul
         }
 
         
-        capsule->impl_dae_hess = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*N);
-        for (int i = 0; i < N; i++) {
-            MAP_CASADI_FNC(impl_dae_hess[i], planner_payload_impl_dae_hess);
-        }
     
         // external cost
         capsule->ext_cost_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
@@ -540,7 +536,6 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
         ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i,
                                    "impl_dae_jac_x_xdot_u", &capsule->impl_dae_jac_x_xdot_u_z[i]);
         
-        ocp_nlp_dynamics_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "impl_dae_hess", &capsule->impl_dae_hess[i]);
     }
 
     /**** Cost ****/
@@ -649,14 +644,14 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
-    lbu[0] = -33.19704;
-    ubu[0] = 33.19704;
-    lbu[1] = -30;
-    ubu[1] = 30;
-    lbu[2] = -30;
-    ubu[2] = 30;
-    lbu[3] = -30;
-    ubu[3] = 30;
+    lbu[0] = -11.06568;
+    ubu[0] = 11.06568;
+    lbu[1] = -12;
+    ubu[1] = 12;
+    lbu[2] = -12;
+    ubu[2] = 12;
+    lbu[3] = -12;
+    ubu[3] = 12;
 
     for (int i = 0; i < N; i++)
     {
@@ -722,17 +717,6 @@ static void planner_payload_acados_create_set_opts(planner_payload_solver_capsul
     ************************************************/
 
 
-    int nlp_solver_exact_hessian = 1;
-    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "exact_hess", &nlp_solver_exact_hessian);
-
-    int exact_hess_dyn = 1;
-    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "exact_hess_dyn", &exact_hess_dyn);
-
-    int exact_hess_cost = 1;
-    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "exact_hess_cost", &exact_hess_cost);
-
-    int exact_hess_constr = 1;
-    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "exact_hess_constr", &exact_hess_constr);
 
     int fixed_hess = 0;
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "fixed_hess", &fixed_hess);
@@ -1067,13 +1051,11 @@ int planner_payload_acados_free(planner_payload_solver_capsule* capsule)
         external_function_external_param_casadi_free(&capsule->impl_dae_fun_jac_x_xdot_z[i]);
         external_function_external_param_casadi_free(&capsule->impl_dae_jac_x_xdot_u_z[i]);
         
-        external_function_external_param_casadi_free(&capsule->impl_dae_hess[i]);
     }
     free(capsule->impl_dae_fun);
     free(capsule->impl_dae_fun_jac_x_xdot_z);
     free(capsule->impl_dae_jac_x_xdot_u_z);
     
-    free(capsule->impl_dae_hess);
 
     // cost
     external_function_external_param_casadi_free(&capsule->ext_cost_0_fun);

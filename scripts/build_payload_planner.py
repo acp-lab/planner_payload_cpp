@@ -30,7 +30,6 @@ class PayloadControlMujocoNode():
         self.weight_cable_direction = float(10)
         self.weight_tension = float(10)
         self.weight_rdot = float(10)
-        self.weight_orthogonality = float(100)
         #self.norm_constraint_slack_weight = float(0.1)
         #self.unit_vector_norm_tol = float(1e-3)
 
@@ -109,14 +108,14 @@ class PayloadControlMujocoNode():
         print(self.u_equilibrium)
 
         # Maximum and minimun control actions
-        self.tension_min = 0.5*self.tensions_init
-        self.tension_max = 10.0*self.tensions_init
+        self.tension_min = 0.8*self.tensions_init
+        self.tension_max = 5.0*self.tensions_init
 
-        self.r_dot_max = np.array([10.0, 10.0, 10.0]*self.robot_num, dtype=np.double)
+        self.r_dot_max = np.array([6.0, 6.0, 6.0]*self.robot_num, dtype=np.double)
         self.r_dot_min = -self.r_dot_max
-        self.tension_dot_max = 30.0*self.tensions_init
+        self.tension_dot_max = 10.0*self.tensions_init
         self.tension_dot_min = -self.tension_dot_max
-        self.r_ddot_max = np.array([30.0, 30.0, 30.0]*self.robot_num, dtype=np.double)
+        self.r_ddot_max = np.array([12.0, 12.0, 12.0]*self.robot_num, dtype=np.double)
         self.r_ddot_min = -self.r_ddot_max
 
         # Control bounds are on rates [tension_dot, r_ddot]
@@ -286,8 +285,8 @@ class PayloadControlMujocoNode():
             + self.weight_cable_direction * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
-            + 0.05 * (t_dot_cmd * t_dot_cmd)
-            + 0.05 * (r_ddot_cmd.T @ r_ddot_cmd)
+            + 0.2 * (t_dot_cmd * t_dot_cmd)
+            + 0.2 * (r_ddot_cmd.T @ r_ddot_cmd)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
@@ -331,7 +330,7 @@ class PayloadControlMujocoNode():
 
         ocp.solver_options.qp_solver = "FULL_CONDENSING_HPIPM" 
         ocp.solver_options.qp_solver_cond_N = self.N_prediction
-        ocp.solver_options.hessian_approx = "EXACT"  
+        ocp.solver_options.hessian_approx = "GAUSS_NEWTON"  
 
         ocp.solver_options.integrator_type = "IRK"
         ocp.solver_options.sim_method_num_stages = 4  # IRK-GL4: 4 stages for accuracy

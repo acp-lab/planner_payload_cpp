@@ -485,13 +485,25 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
     point.position.x = quad_position(0);
     point.position.y = quad_position(1);
     point.position.z = quad_position(2);
+
     point.velocity.x = quad_velocity(0);
     point.velocity.y = quad_velocity(1);
     point.velocity.z = quad_velocity(2);
+
     point.acceleration.x = quad_acceleration(0);
     point.acceleration.y = quad_acceleration(1);
     point.acceleration.z = quad_acceleration(2);
+
+    point.cable_direction.x = state_i(6);
+    point.cable_direction.y = state_i(7);
+    point.cable_direction.z = state_i(8);
+
+    point.cable_r.x = state_i(9);
+    point.cable_r.y = state_i(10);
+    point.cable_r.z = state_i(11);
+
     point.tension = state_i(12);
+
     point.cable_r_dot.x = state_i(13);
     point.cable_r_dot.y = state_i(14);
     point.cable_r_dot.z = state_i(15);
