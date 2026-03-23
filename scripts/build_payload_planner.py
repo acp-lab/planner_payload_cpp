@@ -280,14 +280,20 @@ class PayloadControlMujocoNode():
 
         ocp.model.cost_expr_ext_cost = (
             lyapunov_position
+            + self.weight_cable_direction * (error_n1.T @ error_n1)
+            + self.weight_cable_direction * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
+            + self.weight_rdot * (r_dot_error.T @ r_dot_error)
             + 0.01 * (t_dot_cmd * t_dot_cmd)
             + 0.01 * (r_ddot_cmd.T @ r_ddot_cmd)
             + self.weight_orthogonality * (orthogonality_error**2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
+            + self.weight_cable_direction * (error_n1.T @ error_n1)
+            + self.weight_cable_direction * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
+            + self.weight_rdot * (r_dot_error.T @ r_dot_error)
             + self.weight_orthogonality * (orthogonality_error**2)
         )
 

@@ -309,8 +309,13 @@ void NMPCControlNodelet::referenceCallback(
       reference_states(6, i) = point.cable_direction.x;
       reference_states(7, i) = point.cable_direction.y;
       reference_states(8, i) = point.cable_direction.z;
-      reference_states.block<3, 1>(9, i) = r_eq;
+
+      reference_states(9, i) = point.cable_r.x;
+      reference_states(10, i) = point.cable_r.y;
+      reference_states(11, i) = point.cable_r.z;
+
       reference_states(12, i) = point.tension;
+
       reference_states(13, i) = point.cable_r_dot.x;
       reference_states(14, i) = point.cable_r_dot.y;
       reference_states(15, i) = point.cable_r_dot.z;
