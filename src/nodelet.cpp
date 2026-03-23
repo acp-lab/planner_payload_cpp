@@ -74,33 +74,33 @@ public:
 
     // Publish payload desired and predictions
     pub_ref_traj_ = this->create_publisher<nav_msgs::msg::Path>(
-        "/quadrotor/payload_reference_path", 1);
+        "payload_reference_path", 1);
 
     pub_pred_traj_ = this->create_publisher<nav_msgs::msg::Path>(
-        "/quadrotor/payload_predicted_path", 1);
+        "payload_predicted_path", 1);
 
     // Publish quadrotor desired
     pub_desired_quadrotor_ =
         this->create_publisher<quadrotor_msgs::msg::PositionCommand>(
-            "/quadrotor/payload_planner_quadrotor_cmd", 1);
+            "payload_planner_quadrotor_cmd", 1);
 
     // Subscribers
     sub_payload_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/quadrotor/payload/odom", qos_profile,
+        "payload/odom", qos_profile,
         std::bind(&NMPCControlNodelet::payloadOdomCallback, this,
                   std::placeholders::_1));
     sub_quad_odometry_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/quadrotor/odom", qos_profile,
+        "odom", qos_profile,
         std::bind(&NMPCControlNodelet::quadOdomCallback, this,
                   std::placeholders::_1));
     sub_position_cmd_ =
         this->create_subscription<quadrotor_msgs::msg::PositionCommand>(
-            "/quadrotor/position_cmd", 1,
+            "position_cmd", 1,
             std::bind(&NMPCControlNodelet::referenceCallback, this,
                       std::placeholders::_1));
 
     srv_activate_payload_ = this->create_service<std_srvs::srv::SetBool>(
-        "/quadrotor/activate_payload_nmpc_controller",
+        "activate_payload_nmpc_controller",
         std::bind(&NMPCControlNodelet::activate_payload_callback, this,
                   std::placeholders::_1, std::placeholders::_2));
   }
@@ -292,8 +292,9 @@ void NMPCControlNodelet::referenceCallback(
       // Inputs are [tension_dot, r_ddot] references.
       reference_inputs.col(i).setZero();
     }
-    RCLCPP_WARN_THROTTLE(this->get_logger(), clock_, 1000,
-                         "[PayloadOlanner] Obtaining only one point reference");
+    RCLCPP_WARN_THROTTLE(
+        this->get_logger(), clock_, 1000,
+        "[NMPC Payload Planner] Obtaining only one point reference");
   } else {
     for (int i = 0; i < kSamples; ++i) {
       const size_t idx = std::min(static_cast<size_t>(i), n_points - 1U);
@@ -302,6 +303,7 @@ void NMPCControlNodelet::referenceCallback(
       reference_states(0, i) = point.position.x;
       reference_states(1, i) = point.position.y;
       reference_states(2, i) = point.position.z;
+
       reference_states(3, i) = point.velocity.x;
       reference_states(4, i) = point.velocity.y;
       reference_states(5, i) = point.velocity.z;
@@ -330,7 +332,7 @@ void NMPCControlNodelet::referenceCallback(
     run();
   } else {
     RCLCPP_INFO_THROTTLE(
-        this->get_logger(), *this->get_clock(), 5000,
+        this->get_logger(), *this->get_clock(), 1000,
         "[NMPC Payload Planner] Waiting to switch to payload planner ");
   }
 }
@@ -432,6 +434,7 @@ void NMPCControlNodelet::publishReference() {
 
 void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
   const auto predicted_states = controller_.getPredictedStates();
+  const auto predicted_inputs = controller_.getPredictedInputs();
 
   quadrotor_msgs::msg::PositionCommand position_cmd_msg;
   position_cmd_msg.header.stamp = this->now();
@@ -471,8 +474,12 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
 
   position_cmd_msg.points.reserve(kSamples);
   for (int i = 0; i < kSamples; ++i) {
+
     const int state_idx = std::min(i + 1, kSamples - 1);
+    const int input_idx = std::min(i, kSamples - 1);
+
     const auto state_i = predicted_states.col(state_idx);
+    const auto input_i = predicted_inputs.col(input_idx);
 
     const Eigen::Vector3d quad_position =
         quadrotorPositionFromPayloadState(state_i);
@@ -507,6 +514,12 @@ void NMPCControlNodelet::publishDesiredQuadrotorCommand() {
     point.cable_r_dot.x = state_i(13);
     point.cable_r_dot.y = state_i(14);
     point.cable_r_dot.z = state_i(15);
+
+    point.tension_dot = input_i(0);
+    point.cable_r_dot_dot.x = input_i(1);
+    point.cable_r_dot_dot.y = input_i(2);
+    point.cable_r_dot_dot.z = input_i(3);
+
     position_cmd_msg.points.push_back(point);
   }
 

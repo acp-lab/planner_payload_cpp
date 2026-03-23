@@ -28,10 +28,11 @@ def yaml_to_dict(path_to_yaml):
 class PayloadControlMujocoNode():
     def __init__(self, params):
         self.weight_cable_direction = float(10)
+        self.weight_r = float(10)
         self.weight_tension = float(10)
         self.weight_rdot = float(10)
-        #self.norm_constraint_slack_weight = float(0.1)
-        #self.unit_vector_norm_tol = float(1e-3)
+        self.norm_constraint_slack_weight = float(10.0)
+        self.unit_vector_norm_tol = float(1e-3)
 
         # Time Definition
         self.final = 15
@@ -62,7 +63,7 @@ class PayloadControlMujocoNode():
         c1 = 1
         kp_min = 100
         self.kp_min = kp_min
-        self.kv_min = 10
+        self.kv_min = 20
         self.c1 = c1
         
         # Cable length
@@ -108,14 +109,9 @@ class PayloadControlMujocoNode():
         print(self.u_equilibrium)
 
         # Maximum and minimun control actions
-        self.tension_min = 0.8*self.tensions_init
-        self.tension_max = 5.0*self.tensions_init
-
-        self.r_dot_max = np.array([6.0, 6.0, 6.0]*self.robot_num, dtype=np.double)
-        self.r_dot_min = -self.r_dot_max
-        self.tension_dot_max = 10.0*self.tensions_init
+        self.tension_dot_max = 40.0*self.tensions_init
         self.tension_dot_min = -self.tension_dot_max
-        self.r_ddot_max = np.array([12.0, 12.0, 12.0]*self.robot_num, dtype=np.double)
+        self.r_ddot_max = np.array([30.0, 30.0, 3.0]*self.robot_num, dtype=np.double)
         self.r_ddot_min = -self.r_ddot_max
 
         # Control bounds are on rates [tension_dot, r_ddot]
@@ -282,16 +278,16 @@ class PayloadControlMujocoNode():
         ocp.model.cost_expr_ext_cost = (
             lyapunov_position
             + self.weight_cable_direction * (error_n1.T @ error_n1)
-            + self.weight_cable_direction * (r_error.T @ r_error)
+            + self.weight_r * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
-            + 0.2 * (t_dot_cmd * t_dot_cmd)
-            + 0.2 * (r_ddot_cmd.T @ r_ddot_cmd)
+            + 0.1 * (t_dot_cmd * t_dot_cmd)
+            + 0.1 * (r_ddot_cmd.T @ r_ddot_cmd)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
             + self.weight_cable_direction * (error_n1.T @ error_n1)
-            + self.weight_cable_direction * (r_error.T @ r_error)
+            + self.weight_r * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
         )
@@ -313,20 +309,20 @@ class PayloadControlMujocoNode():
         ocp.constraints.x0 = x0
 
         # Softly enforce ||n1|| ~= 1 to improve robustness against numerical drift.
-        #ocp.model.con_h_expr = ca.vertcat(ca.dot(n1, n1))
-        #nh = 1
-        #nsbx = 0
-        #nsh = nh
-        #ns = nsh + nsbx
-        #ocp.cost.zl = self.norm_constraint_slack_weight * np.ones((ns, ))
-        #ocp.cost.Zl = self.norm_constraint_slack_weight * np.ones((ns, ))
-        #ocp.cost.zu = self.norm_constraint_slack_weight * np.ones((ns, ))
-        #ocp.cost.Zu = self.norm_constraint_slack_weight * np.ones((ns, ))
-        #ocp.constraints.lh = np.array([1.0 - self.unit_vector_norm_tol])
-        #ocp.constraints.uh = np.array([1.0 + self.unit_vector_norm_tol])
-        #ocp.constraints.lsh = np.zeros((nsh, ))
-        #ocp.constraints.ush = np.zeros((nsh, ))
-        #ocp.constraints.idxsh = np.array(range(nsh), dtype=np.int32)
+        ocp.model.con_h_expr = ca.vertcat(ca.dot(n1, n1))
+        nh = 1
+        nsbx = 0
+        nsh = nh
+        ns = nsh + nsbx
+        ocp.cost.zl = self.norm_constraint_slack_weight * np.ones((ns, ))
+        ocp.cost.Zl = self.norm_constraint_slack_weight * np.ones((ns, ))
+        ocp.cost.zu = self.norm_constraint_slack_weight * np.ones((ns, ))
+        ocp.cost.Zu = self.norm_constraint_slack_weight * np.ones((ns, ))
+        ocp.constraints.lh = np.array([1.0 - self.unit_vector_norm_tol])
+        ocp.constraints.uh = np.array([1.0 + self.unit_vector_norm_tol])
+        ocp.constraints.lsh = np.zeros((nsh, ))
+        ocp.constraints.ush = np.zeros((nsh, ))
+        ocp.constraints.idxsh = np.array(range(nsh), dtype=np.int32)
 
         ocp.solver_options.qp_solver = "FULL_CONDENSING_HPIPM" 
         ocp.solver_options.qp_solver_cond_N = self.N_prediction
@@ -340,7 +336,7 @@ class PayloadControlMujocoNode():
 
         #ocp.solver_options.time_steps = self.t_steps
         #ocp.solver_options.shooting_nodes = self.shooting_nodes
-        ocp.solver_options.levenberg_marquardt = 1e-6
+        ocp.solver_options.levenberg_marquardt = 1.0
 
         ocp.solver_options.nlp_solver_type = "SQP_RTI"
         ocp.solver_options.nlp_solver_max_iter = 2
@@ -350,8 +346,6 @@ class PayloadControlMujocoNode():
         ocp.solver_options.regularize_method = 'NO_REGULARIZE'  
         #ocp.solver_options.levenberg_marquardt = 10.0
 
-        ocp.solver_options.timeout_max_time = 1*1e-3
-        ocp.solver_options.timeout_heuristic = "ZERO"
         return ocp
 
 
