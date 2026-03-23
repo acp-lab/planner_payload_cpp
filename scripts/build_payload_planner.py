@@ -27,10 +27,10 @@ def yaml_to_dict(path_to_yaml):
 
 class PayloadControlMujocoNode():
     def __init__(self, params):
-        self.weight_cable_direction = float(0.1)
-        self.weight_tension = float(50.0)
-        self.weight_rdot = float(50.0)
-        self.weight_orthogonality = float(0.1)
+        self.weight_cable_direction = float(10)
+        self.weight_tension = float(10)
+        self.weight_rdot = float(10)
+        self.weight_orthogonality = float(100)
         #self.norm_constraint_slack_weight = float(0.1)
         #self.unit_vector_norm_tol = float(1e-3)
 
@@ -63,7 +63,7 @@ class PayloadControlMujocoNode():
         c1 = 1
         kp_min = 100
         self.kp_min = kp_min
-        self.kv_min = 5
+        self.kv_min = 10
         self.c1 = c1
         
         # Cable length
@@ -114,9 +114,9 @@ class PayloadControlMujocoNode():
 
         self.r_dot_max = np.array([10.0, 10.0, 10.0]*self.robot_num, dtype=np.double)
         self.r_dot_min = -self.r_dot_max
-        self.tension_dot_max = 20.0*self.tensions_init
+        self.tension_dot_max = 30.0*self.tensions_init
         self.tension_dot_min = -self.tension_dot_max
-        self.r_ddot_max = np.array([20.0, 20.0, 20.0]*self.robot_num, dtype=np.double)
+        self.r_ddot_max = np.array([30.0, 30.0, 30.0]*self.robot_num, dtype=np.double)
         self.r_ddot_min = -self.r_ddot_max
 
         # Control bounds are on rates [tension_dot, r_ddot]
@@ -269,11 +269,13 @@ class PayloadControlMujocoNode():
 
         # Error cable direction
         error_n1 = ca.cross(n1_d, n1)
-        r_error = r1_d - r1
+        I = ca.MX.eye(3)
+
+        r_error = r1 - (I - n1@n1.T)@r1_d
+        r_dot_error = r1_dot - (I - n1@n1.T)@r_dot_d
 
         # Cost Function control actions
         tension_error = t_d - t_1
-        r_dot_error = r_dot_d - r1_dot 
         
         # Enforce the velocity is orthogonal
         orthogonality_error = ca.dot(n1, r1)
@@ -284,9 +286,8 @@ class PayloadControlMujocoNode():
             + self.weight_cable_direction * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
-            + 0.01 * (t_dot_cmd * t_dot_cmd)
-            + 0.01 * (r_ddot_cmd.T @ r_ddot_cmd)
-            + self.weight_orthogonality * (orthogonality_error**2)
+            + 0.05 * (t_dot_cmd * t_dot_cmd)
+            + 0.05 * (r_ddot_cmd.T @ r_ddot_cmd)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
@@ -294,7 +295,6 @@ class PayloadControlMujocoNode():
             + self.weight_cable_direction * (r_error.T @ r_error)
             + self.weight_tension * (tension_error * tension_error)
             + self.weight_rdot * (r_dot_error.T @ r_dot_error)
-            + self.weight_orthogonality * (orthogonality_error**2)
         )
 
         ref_params = np.hstack((self.x_0, self.u_equilibrium))
@@ -308,9 +308,9 @@ class PayloadControlMujocoNode():
         ocp.constraints.ubu = self.u_max
         ocp.constraints.idxbu = np.array([0, 1, 2, 3])
         # Keep augmented tension and r_dot states within physical limits.
-        ocp.constraints.idxbx = np.array([12, 13, 14, 15], dtype=np.int32)
-        ocp.constraints.lbx = np.hstack((self.tension_min, self.r_dot_min))
-        ocp.constraints.ubx = np.hstack((self.tension_max, self.r_dot_max))
+        #ocp.constraints.idxbx = np.array([12, 13, 14, 15], dtype=np.int32)
+        #ocp.constraints.lbx = np.hstack((self.tension_min, self.r_dot_min))
+        #ocp.constraints.ubx = np.hstack((self.tension_max, self.r_dot_max))
         ocp.constraints.x0 = x0
 
         # Softly enforce ||n1|| ~= 1 to improve robustness against numerical drift.

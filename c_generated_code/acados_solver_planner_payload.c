@@ -649,14 +649,14 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
     double* lubu = calloc(2*NBU, sizeof(double));
     double* lbu = lubu;
     double* ubu = lubu + NBU;
-    lbu[0] = -22.13136;
-    ubu[0] = 22.13136;
-    lbu[1] = -20;
-    ubu[1] = 20;
-    lbu[2] = -20;
-    ubu[2] = 20;
-    lbu[3] = -20;
-    ubu[3] = 20;
+    lbu[0] = -33.19704;
+    ubu[0] = 33.19704;
+    lbu[1] = -30;
+    ubu[1] = 30;
+    lbu[2] = -30;
+    ubu[2] = 30;
+    lbu[3] = -30;
+    ubu[3] = 30;
 
     for (int i = 0; i < N; i++)
     {
@@ -674,32 +674,6 @@ void planner_payload_acados_setup_nlp_in(planner_payload_solver_capsule* capsule
 
     /* Path constraints */
 
-    // x
-    int* idxbx = malloc(NBX * sizeof(int));
-    idxbx[0] = 12;
-    idxbx[1] = 13;
-    idxbx[2] = 14;
-    idxbx[3] = 15;
-    double* lubx = calloc(2*NBX, sizeof(double));
-    double* lbx = lubx;
-    double* ubx = lubx + NBX;
-    lbx[0] = 0.553284;
-    ubx[0] = 11.06568;
-    lbx[1] = -10;
-    ubx[1] = 10;
-    lbx[2] = -10;
-    ubx[2] = 10;
-    lbx[3] = -10;
-    ubx[3] = 10;
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "idxbx", idxbx);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "lbx", lbx);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, nlp_out, i, "ubx", ubx);
-    }
-    free(idxbx);
-    free(lubx);
 
 
 
