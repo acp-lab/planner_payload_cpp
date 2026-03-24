@@ -40,23 +40,23 @@ public:
     logParameter("platform_type", platform_type_, "%s");
 
     this->declare_parameter<std::vector<double>>(
-        "nmpc.Q", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5., 5.,
-                                      1., 1., 1., 50., 10., 10., 10.});
-    this->declare_parameter<std::vector<double>>(
-        "nmpc.Q_e", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
+        "nmpc.Q_p", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
                                         5., 1., 1., 1., 50., 10., 10., 10.});
     this->declare_parameter<std::vector<double>>(
-        "nmpc.R", std::vector<double>{0.5, 0.1, 0.1, 0.1});
+        "nmpc.Q_p_e", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
+                                          5., 1., 1., 1., 50., 10., 10., 10.});
+    this->declare_parameter<std::vector<double>>(
+        "nmpc.R_p", std::vector<double>{0.5, 0.1, 0.1, 0.1});
 
-    rclcpp::Parameter Q_param = this->get_parameter("nmpc.Q");
-    rclcpp::Parameter Q_e_param = this->get_parameter("nmpc.Q_e");
-    rclcpp::Parameter R_param = this->get_parameter("nmpc.R");
+    rclcpp::Parameter Q_param = this->get_parameter("nmpc.Q_p");
+    rclcpp::Parameter Q_e_param = this->get_parameter("nmpc.Q_p_e");
+    rclcpp::Parameter R_param = this->get_parameter("nmpc.R_p");
 
-    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q_p: %s",
                 Q_param.value_to_string().c_str());
-    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q_e: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] Q_p_e: %s",
                 Q_e_param.value_to_string().c_str());
-    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] R: %s",
+    RCLCPP_INFO(this->get_logger(), "[NMPC Payload Planner] R_p: %s",
                 R_param.value_to_string().c_str());
 
     Q_param_ = Q_param.as_double_array();

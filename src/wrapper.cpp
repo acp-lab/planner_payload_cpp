@@ -191,7 +191,7 @@ void NMPCWrapper::setWeightMatrices(std::vector<double> Q,
   const int params_size = static_cast<int>(params.size());
   const int expected_cost_params = NP - yRefSize;
   if (params_size != expected_cost_params) {
-    std::cerr << "[NMPCWrapper] setWeightMatrices size mismatch: got "
+    std::cerr << "[NMPCWrapper Payload] setWeightMatrices size mismatch: got "
               << params_size << " values (Q=" << Q.size()
               << ", Q_e=" << Q_e.size() << ", R=" << R.size()
               << ") but expected " << expected_cost_params << " (NP=" << NP
@@ -207,8 +207,8 @@ void NMPCWrapper::setWeightMatrices(std::vector<double> Q,
         acados_ocp_capsule, i, params_indices.data(), params.data(),
         params_size);
     if (status != 0) {
-      std::cerr << "[NMPCWrapper] update_params_sparse failed at stage " << i
-                << " with status " << status << std::endl;
+      std::cerr << "[NMPCWrapper Payload] update_params_sparse failed at stage "
+                << i << " with status " << status << std::endl;
       return;
     }
   }
@@ -220,12 +220,13 @@ void NMPCWrapper::setWeightMatrices(std::vector<double> Q,
   const bool updated_ok =
       std::equal(params.begin(), params.end(), updated_segment);
   if (!updated_ok) {
-    std::cerr << "[NMPCWrapper] parameter verification failed for stage 0."
-              << std::endl;
+    std::cerr
+        << "[NMPCWrapper Payload] parameter verification failed for stage 0."
+        << std::endl;
     return;
   }
 
-  std::cout << "[NMPCWrapper] Updated and verified " << params_size
+  std::cout << "[NMPCWrapper Payload] Updated and verified " << params_size
             << " cost parameters on all stages." << std::endl;
 }
 
