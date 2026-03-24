@@ -64,7 +64,7 @@
 #define PLANNER_PAYLOAD_NY0    0
 #define PLANNER_PAYLOAD_NY     0
 #define PLANNER_PAYLOAD_NYN    0
-#define PLANNER_PAYLOAD_N      51
+#define PLANNER_PAYLOAD_N      31
 #define PLANNER_PAYLOAD_NH     1
 #define PLANNER_PAYLOAD_NHN    0
 #define PLANNER_PAYLOAD_NH0    0

@@ -73,7 +73,7 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
     const int np = PLANNER_PAYLOAD_NP;
     bool tmp_bool;
 
-    double Tsim = 0.049019607843137254;
+    double Tsim = 0.04838709677419355;
 
     capsule->acados_sim_mem = NULL;
 
