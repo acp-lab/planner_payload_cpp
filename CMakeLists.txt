@@ -41,6 +41,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fopenmp -O3")
 set(acados_path "$ENV{ACADOS_SOURCE_DIR}")
 set(acados_lib "${acados_path}/lib")
 set(acados_generated_code "${PROJECT_SOURCE_DIR}/c_generated_code")
+set(acados_generated_code_jerk "${PROJECT_SOURCE_DIR}/c_generated_code_jerk")
 
 if("${acados_path}" STREQUAL "")
   message(FATAL_ERROR "ACADOS_SOURCE_DIR is not set. Please export ACADOS_SOURCE_DIR to your acados root path.")
@@ -62,6 +63,7 @@ set(dependencies
 include_directories(include
   ${EIGEN3_INCLUDE_DIR}
   ${acados_generated_code}
+  ${acados_generated_code_jerk}
   ${acados_path}/interfaces
   ${acados_path}/acados
   ${acados_path}/acados/utils
@@ -72,6 +74,7 @@ include_directories(include
 )
 
 link_directories(${acados_generated_code})
+link_directories(${acados_generated_code_jerk})
 
 add_library(planner_payload_component SHARED
   src/nodelet.cpp
@@ -79,32 +82,57 @@ add_library(planner_payload_component SHARED
   src/nmpc_planner.cpp
 )
 
+add_library(planner_payload_jerk_component SHARED
+  src/nodelet_jerk.cpp
+  src/wrapper_jerk.cpp
+  src/nmpc_planner_jerk.cpp
+)
+
 set_target_properties(planner_payload_component PROPERTIES COMPILE_DEFINITIONS "COMPOSITION_BUILDING_DLL")
+set_target_properties(planner_payload_jerk_component PROPERTIES COMPILE_DEFINITIONS "COMPOSITION_BUILDING_DLL")
 
 target_include_directories(planner_payload_component
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_include_directories(planner_payload_jerk_component
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 
 ament_target_dependencies(planner_payload_component ${dependencies})
+ament_target_dependencies(planner_payload_jerk_component ${dependencies})
 target_link_libraries(planner_payload_component
   Eigen3::Eigen
   yaml-cpp
   libacados_ocp_solver_planner_payload.so
   ${acados_lib}/libacados.so
 )
+target_link_libraries(planner_payload_jerk_component
+  Eigen3::Eigen
+  yaml-cpp
+  libacados_ocp_solver_planner_payload_jerk.so
+  ${acados_lib}/libacados.so
+)
 
 rclcpp_components_register_node(planner_payload_component
   PLUGIN "planner_payload_nodelet::NMPCControlNodelet"
   EXECUTABLE planner_payload_nodelet_exec)
+rclcpp_components_register_node(planner_payload_jerk_component
+  PLUGIN "planner_payload_jerk_nodelet::NMPCControlJerkNodelet"
+  EXECUTABLE planner_payload_jerk_nodelet_exec)
 ament_export_libraries(planner_payload_component)
+ament_export_libraries(planner_payload_jerk_component)
 
 
 
 install(TARGETS
   planner_payload_component
   planner_payload_nodelet_exec
+  planner_payload_jerk_component
+  planner_payload_jerk_nodelet_exec
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -116,6 +144,7 @@ install(DIRECTORY include/
 
 install(PROGRAMS
   scripts/build_payload_planner.py
+  scripts/build_payload_planner_jerk.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
