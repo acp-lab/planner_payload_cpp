@@ -492,9 +492,9 @@ private:
 
   NMPCControlJerk controller_;
   std::string frame_id_;
-  double mass_payload_{0.1128};
+  double mass_payload_{0.12};
   double gravity_{9.81};
-  double cable_length_{0.88};
+  double cable_length_{0.76};
   double cable_signal_filter_alpha_{0.2};
   std::vector<double> Q_param_;
   std::vector<double> Q_e_param_;
