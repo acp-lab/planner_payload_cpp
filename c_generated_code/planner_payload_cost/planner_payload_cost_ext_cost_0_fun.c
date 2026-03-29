@@ -167,8 +167,8 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   /* #25: @1 = mac(@21,@19,@0) */
   casadi_copy((&w00), 1, (&w01));
   for (i=0, rr=(&w01); i<1; ++i) for (j=0; j<1; ++j, ++rr) for (k=0, cs=w21+j, ct=w19+i*3; k<3; ++k) *rr += cs[k*1]**ct++;
-  /* #26: @2 = 1.128 */
-  w02 = 1.1279999999999999e+00;
+  /* #26: @2 = 1.2 */
+  w02 = 1.2000000000000000e+00;
   /* #27: @21 = @18[3:6] */
   for (rr=w21, cs=w18+3; cs!=w18+6; cs+=1) *rr++ = *cs;
   /* #28: @19 = @20[3:6] */
