@@ -172,8 +172,8 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   for (i=0, rr=(&w02); i<1; ++i) for (j=0; j<1; ++j, ++rr) for (k=0, cs=w20+j, ct=w18+i*3; k<3; ++k) *rr += cs[k*1]**ct++;
   /* #24: @0 = (@0*@2) */
   w00 *= w02;
-  /* #25: @2 = 0.3 */
-  w02 = 2.9999999999999999e-01;
+  /* #25: @2 = 0.5 */
+  w02 = 5.0000000000000000e-01;
   /* #26: @20 = @17[3:6] */
   for (rr=w20, cs=w17+3; cs!=w17+6; cs+=1) *rr++ = *cs;
   /* #27: @18 = @19[3:6] */

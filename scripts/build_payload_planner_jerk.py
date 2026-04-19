@@ -70,6 +70,9 @@ class PayloadPlannerJerkBuilder:
         print(self.tension_min)
         print(self.tension_max)
 
+        print("Wrench on the cable")
+        print(wrench_0)
+
 
         self.project_root = Path(__file__).resolve().parents[1]
         self.code_export_directory = self.project_root / "c_generated_code_jerk"

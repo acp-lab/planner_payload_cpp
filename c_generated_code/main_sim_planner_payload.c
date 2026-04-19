@@ -93,7 +93,7 @@ int main()
     x_current[9] = 0;
     x_current[10] = 0;
     x_current[11] = 0;
-    x_current[12] = 1.1772;
+    x_current[12] = 1.962;
     x_current[13] = 0;
     x_current[14] = 0;
     x_current[15] = 0;
@@ -121,7 +121,7 @@ int main()
     p[9] = 0;
     p[10] = 0;
     p[11] = 0;
-    p[12] = 1.1772;
+    p[12] = 1.962;
     p[13] = 0;
     p[14] = 0;
     p[15] = 0;

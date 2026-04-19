@@ -185,7 +185,7 @@ int planner_payload_acados_sim_create(planner_payload_sim_solver_capsule * capsu
     
     p[2] = 0.47;
     p[8] = -1;
-    p[12] = 1.1772;
+    p[12] = 1.962;
 
     planner_payload_acados_sim_update_params(capsule, p, np);
     free(p);

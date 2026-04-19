@@ -692,9 +692,9 @@ void planner_payload_jerk_acados_setup_nlp_in(planner_payload_jerk_solver_capsul
     double* lh = luh;
     double* uh = luh + NH;
     lh[0] = 0.999;
-    lh[1] = 0.11772;
+    lh[1] = 0.19620000000000004;
     uh[0] = 1.001;
-    uh[1] = 11.772;
+    uh[1] = 19.62;
 
     for (int i = 1; i < N; i++)
     {
