@@ -202,7 +202,7 @@ class PayloadPlannerJerkBuilder:
         )
 
         lyapunov_position = (
-            50.0 * self.kp_min * (error_position.T @ error_position)
+            100.0 * self.kp_min * (error_position.T @ error_position)
             + 0.5 * self.kv_min * self.mass * (error_velocity.T @ error_velocity)
         )
 

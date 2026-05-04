@@ -276,8 +276,8 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   casadi_real w48, w49, *w50=w+227, w51, w52, *w53=w+231, *w54=w+237;
   const casadi_int *cii;
   const casadi_real *cr, *cs, *ct, *wr19, *wr20, *wr22, *wr26, *wr31, *wr33, *wr35;
-  /* #0: @0 = 5000 */
-  w00 = 5000.;
+  /* #0: @0 = 10000 */
+  w00 = 10000.;
   /* #1: @1 = 0 */
   w01 = 0.;
   /* #2: @2 = input[0][0] */
