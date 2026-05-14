@@ -211,8 +211,13 @@ class PayloadPlannerJerkBuilder:
             - ca.dot(n1, (a_q + self.gravity * self.e3))
         )
 
+        self.Q = ca.MX.zeros(3, 3)
+        self.Q[0, 0] = 1.0
+        self.Q[1, 1] = 1.0
+        self.Q[2, 2] = 20.0
+
         lyapunov_position = (
-            100.0 * self.kp_min * (error_position.T @ error_position)
+            100.0 * self.kp_min * (error_position.T @ self.Q @ error_position)
             + 0.5 * self.kv_min * self.mass * (error_velocity.T @ error_velocity)
         )
 
