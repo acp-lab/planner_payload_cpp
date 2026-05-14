@@ -16,7 +16,7 @@ class NMPCControlJerkNodelet : public rclcpp::Node {
 public:
   NMPCControlJerkNodelet(const rclcpp::NodeOptions &options)
       : Node("nmpc_control_jerk_nodelet", options), frame_id_("world") {
-    this->declare_parameter("mass_payload", 0.12);
+    this->declare_parameter("mass_payload", 0.2);
     this->declare_parameter("gravity", 9.81);
     this->declare_parameter("cable_length", 0.76);
     this->declare_parameter("cable_signal_filter_alpha", 0.2);
@@ -492,7 +492,7 @@ private:
 
   NMPCControlJerk controller_;
   std::string frame_id_;
-  double mass_payload_{0.12};
+  double mass_payload_{0.2};
   double gravity_{9.81};
   double cable_length_{0.76};
   double cable_signal_filter_alpha_{0.2};

@@ -73,6 +73,8 @@ class PayloadPlannerJerkBuilder:
         print("Wrench on the cable")
         print(wrench_0)
 
+        print("Tension on the cable")
+        print(tension_0)
 
         self.project_root = Path(__file__).resolve().parents[1]
         self.code_export_directory = self.project_root / "c_generated_code_jerk"
@@ -170,19 +172,26 @@ class PayloadPlannerJerkBuilder:
         x = ocp.model.x
         u = ocp.model.u
         p = ocp.model.p
-
+        
+        # Split states of the system
         x_p = x[0:3]
         v_p = x[3:6]
         n1 = x[6:9]
         r1 = x[9:12]
         a_q = x[12:15]
+        
+        # Control actions of the system
         j_q = u[0:3]
-
+        
+        # Split desired states of the system
         x_p_d = p[0:3]
         v_p_d = p[3:6]
         n1_d = p[6:9]
         r1_d = p[9:12]
         a_q_d = p[12:15]
+
+        # Desired Jerk of the quadrotor
+        j_q_d = p[15:18]
 
         error_position = x_p - x_p_d
         error_velocity = v_p - v_p_d
@@ -194,6 +203,7 @@ class PayloadPlannerJerkBuilder:
         r_error = r1 - tangent_projector @ r1_d
 
         a_q_error = a_q_d - a_q
+        j_q_error = j_q_d - j_q
 
         orthogonality_error = ca.dot(n1, r1)
         tension_expr = self.mass * (
@@ -211,13 +221,14 @@ class PayloadPlannerJerkBuilder:
             + self.weight_cable_direction * (error_n1.T @ error_n1)
             + self.weight_r * (r_error.T @ r_error)
             + self.weight_accel * (a_q_error.T @ a_q_error)
-            + self.weight_jerk * (j_q.T @ j_q)
+            + self.weight_jerk * (j_q_error.T @ j_q_error)
             + self.weight_orthogonality * (orthogonality_error ** 2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
             + self.weight_cable_direction * (error_n1.T @ error_n1)
             + self.weight_r * (r_error.T @ r_error)
+            + self.weight_accel * (a_q_error.T @ a_q_error)
             + self.weight_orthogonality * (orthogonality_error ** 2)
         )
 
