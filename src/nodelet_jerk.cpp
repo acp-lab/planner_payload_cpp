@@ -1,3 +1,5 @@
+#include <Eigen/Core>
+#include <Eigen/src/Core/Matrix.h>
 #include <algorithm>
 #include <cmath>
 
@@ -17,6 +19,7 @@ public:
   NMPCControlJerkNodelet(const rclcpp::NodeOptions &options)
       : Node("nmpc_control_jerk_nodelet", options), frame_id_("world") {
     this->declare_parameter("mass_payload", 0.2);
+    this->declare_parameter("mass", 1.0);
     this->declare_parameter("gravity", 9.81);
     this->declare_parameter("cable_length", 0.76);
     this->declare_parameter("cable_signal_filter_alpha", 0.2);
@@ -31,6 +34,7 @@ public:
         "nmpc.R_jerk", std::vector<double>{0.5, 0.5, 0.5});
 
     this->get_parameter("mass_payload", mass_payload_);
+    this->get_parameter("mass", mass_quadrotor_);
     this->get_parameter("gravity", gravity_);
     this->get_parameter("cable_length", cable_length_);
     this->get_parameter("cable_signal_filter_alpha",
@@ -42,6 +46,8 @@ public:
 
     RCLCPP_INFO(this->get_logger(), "[Jerk NMPC] mass_payload: %.4f",
                 mass_payload_);
+    RCLCPP_INFO(this->get_logger(), "[Jerk NMPC] mass_quadrotor: %.4f",
+                mass_quadrotor_);
     RCLCPP_INFO(this->get_logger(), "[Jerk NMPC] gravity: %.4f", gravity_);
     RCLCPP_INFO(this->get_logger(), "[Jerk NMPC] cable_length: %.4f",
                 cable_length_);
@@ -416,7 +422,6 @@ private:
         cableAngularAccelerationFromState(first_state);
     const double tension = tensionFromState(first_state);
     const Eigen::Vector3d cable_force = tension * first_state.segment<3>(6);
-    double mQ = 1.24;
 
     msg.position.x = quad_pos(0);
     msg.position.y = quad_pos(1);
@@ -485,24 +490,37 @@ private:
       point.cable_r_dot_dot.x = cable_r_dot_dot_i(0);
       point.cable_r_dot_dot.y = cable_r_dot_dot_i(1);
       point.cable_r_dot_dot.z = cable_r_dot_dot_i(2);
+
+      // desired thrust and rotations matrix
+      const Eigen::Vector3d Zw(0.0, 0.0, 1.0);
+      const Eigen::Vector3d Xw(1.0, 0.0, 0.0);
+      const Eigen::Vector3d Yw(0.0, 1.0, 0.0);
+
       Eigen::Vector3d cable_direction = state_i.segment<3>(6);
-      Eigen::Vector3d force =
-          mQ * quad_acceleration - tensionFromState(state_i) * cable_direction;
-      double thrust = force.norm();
 
-      //// Compute the desired orientation
-      Eigen::Vector3d b1c, b2c, b3c;
-      const Eigen::Vector3d b2d(-std::sin(0.0), std::cos(0.0), 0);
-      if (thrust > 1e-6f)
-        b3c.noalias() = force.normalized();
-      else
-        b3c.noalias() = Eigen::Vector3d::UnitZ();
+      Eigen::Vector3d alpha = mass_quadrotor_ * quad_acceleration +
+                              mass_quadrotor_ * gravity_ * Zw -
+                              tensionFromState(state_i) * cable_direction;
+      Eigen::Vector3d beta = mass_quadrotor_ * quad_acceleration +
+                             mass_quadrotor_ * gravity_ * Zw -
+                             tensionFromState(state_i) * cable_direction;
 
-      b1c.noalias() = b2d.cross(b3c).normalized();
-      b2c.noalias() = b3c.cross(b1c).normalized();
+      const Eigen::Vector3d Yc(-std::sin(0.0), std::cos(0.0), 0);
+      const Eigen::Vector3d Xc(std::cos(0.0), std::sin(0.0), 0);
+      const Eigen::Vector3d Zc(0.0, 0.0, 1.0);
+
+      Eigen::Vector3d Xb = Yc.cross(alpha).normalized();
+      Eigen::Vector3d Yb = beta.cross(Xb).normalized();
+      Eigen::Vector3d Zb = Xb.cross(Yb);
       Eigen::Matrix3d R;
-      R << b1c, b2c, b3c;
+
+      R.col(0) = Xb;
+      R.col(1) = Yb;
+      R.col(2) = Zb;
+
       Eigen::Quaterniond orientation = Eigen::Quaterniond(R);
+      double thrust = Zb.dot(alpha);
+
       point.force = thrust;
       point.quaternion.w = orientation.w();
       point.quaternion.x = orientation.x();
@@ -517,6 +535,7 @@ private:
   NMPCControlJerk controller_;
   std::string frame_id_;
   double mass_payload_{0.2};
+  double mass_quadrotor_{1.0};
   double gravity_{9.81};
   double cable_length_{0.76};
   double cable_signal_filter_alpha_{0.2};
