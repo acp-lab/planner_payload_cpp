@@ -416,6 +416,7 @@ private:
         cableAngularAccelerationFromState(first_state);
     const double tension = tensionFromState(first_state);
     const Eigen::Vector3d cable_force = tension * first_state.segment<3>(6);
+    double mQ = 1.24;
 
     msg.position.x = quad_pos(0);
     msg.position.y = quad_pos(1);
@@ -484,6 +485,29 @@ private:
       point.cable_r_dot_dot.x = cable_r_dot_dot_i(0);
       point.cable_r_dot_dot.y = cable_r_dot_dot_i(1);
       point.cable_r_dot_dot.z = cable_r_dot_dot_i(2);
+      Eigen::Vector3d cable_direction = state_i.segment<3>(6);
+      Eigen::Vector3d force =
+          mQ * quad_acceleration - tensionFromState(state_i) * cable_direction;
+      double thrust = force.norm();
+
+      //// Compute the desired orientation
+      Eigen::Vector3d b1c, b2c, b3c;
+      const Eigen::Vector3d b2d(-std::sin(0.0), std::cos(0.0), 0);
+      if (thrust > 1e-6f)
+        b3c.noalias() = force.normalized();
+      else
+        b3c.noalias() = Eigen::Vector3d::UnitZ();
+
+      b1c.noalias() = b2d.cross(b3c).normalized();
+      b2c.noalias() = b3c.cross(b1c).normalized();
+      Eigen::Matrix3d R;
+      R << b1c, b2c, b3c;
+      Eigen::Quaterniond orientation = Eigen::Quaterniond(R);
+      point.force = thrust;
+      point.quaternion.w = orientation.w();
+      point.quaternion.x = orientation.x();
+      point.quaternion.y = orientation.y();
+      point.quaternion.z = orientation.z();
       msg.points.push_back(point);
     }
 
