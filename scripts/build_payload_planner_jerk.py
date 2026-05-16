@@ -212,8 +212,8 @@ class PayloadPlannerJerkBuilder:
         )
 
         self.Q = ca.MX.zeros(3, 3)
-        self.Q[0, 0] = 1.0
-        self.Q[1, 1] = 1.0
+        self.Q[0, 0] = 10.0
+        self.Q[1, 1] = 10.0
         self.Q[2, 2] = 20.0
 
         lyapunov_position = (

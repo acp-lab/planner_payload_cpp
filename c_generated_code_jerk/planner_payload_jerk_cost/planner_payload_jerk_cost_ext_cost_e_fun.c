@@ -169,8 +169,8 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   casadi_copy(w19, 3, w21);
   /* #24: @22 = zeros(3x3) */
   casadi_clear(w22, 9);
-  /* #25: @3 = 1 */
-  w03 = 1.;
+  /* #25: @3 = 10 */
+  w03 = 10.;
   /* #26: @23 = @22; (@23[0] = @3) */
   casadi_copy(w22, 9, w23);
   for (rr=w23+0, cs=(&w03); rr!=w23+1; rr+=1) *rr = *cs++;
