@@ -1,7 +1,7 @@
 {
     "code_gen_opts": {
-        "acados_include_path": "/home/fer/acados/include",
-        "acados_lib_path": "/home/fer/acados/lib",
+        "acados_include_path": "//home/fer/acados/include",
+        "acados_lib_path": "//home/fer/acados/lib",
         "acados_link_libs": {
             "clarabel": "",
             "daqp": "",
@@ -10,9 +10,9 @@
             "openmp": "-fopenmp",
             "osqp": "",
             "qpdunes": "",
-            "qpoases": ""
+            "qpoases": "-lqpOASES_e"
         },
-        "acados_version": "a312651ab",
+        "acados_version": "d9d0ba2e8",
         "code_export_directory": "/home/fer/payload_transportation_ws/src/planner_payload_cpp/c_generated_code_jerk",
         "cython_include_dirs": [
             "/home/fer/.local/lib/python3.10/site-packages/numpy/core/include",
@@ -324,7 +324,7 @@
         "planner_payload_jerk_cost/planner_payload_jerk_cost_ext_cost_e_fun_jac_hess.c",
         "planner_payload_jerk_cost/planner_payload_jerk_cost_ext_cost_e_fun_jac.c"
     ],
-    "hash": "9ebf08469da73ab9ede8e872a5e1a7e5",
+    "hash": "a6a514edf0a550807dddaca254ab9f66",
     "model": {
         "con_h_expr": "MX(@1=vertcat(p_x, p_y, p_z, vx_p, vy_p, vz_p, nx_1, ny_1, nz_1, rx_1, ry_1, rz_1, ax_q, ay_q, az_q), @2=@1[6:9], @3=@1[9:12], vertcat(dot(@2, @2), (0.2*((0.76*dot(@3, @3))-dot(@2, ([0, 0, 9.81]+@1[12:15]))))))",
         "con_h_expr_0": [],
