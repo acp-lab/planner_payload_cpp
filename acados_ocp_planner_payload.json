@@ -7,7 +7,7 @@
             "daqp": "",
             "hpmpc": "",
             "ooqp": "",
-            "openmp": "-fopenmp",
+            "openmp": "",
             "osqp": "",
             "qpdunes": "",
             "qpoases": "-lqpOASES_e"
@@ -320,7 +320,7 @@
         "planner_payload_cost/planner_payload_cost_ext_cost_e_fun_jac_hess.c",
         "planner_payload_cost/planner_payload_cost_ext_cost_e_fun_jac.c"
     ],
-    "hash": "0c4df93950c44c85e1d095a69e2eb00d",
+    "hash": "42936215d3ea3920eca1529948d50b45",
     "model": {
         "con_h_expr": "MX(@1=vertcat(p_x, p_y, p_z, vx_p, vy_p, vz_p, nx_1, ny_1, nz_1, rx_1, ry_1, rz_1, t_1, rdotx_1, rdoty_1, rdotz_1)[6:9], dot(@1, @1))",
         "con_h_expr_0": [],
