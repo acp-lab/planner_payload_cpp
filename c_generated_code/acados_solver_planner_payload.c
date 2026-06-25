@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h> // memcpy
 // acados
 // #include "acados/utils/print.h"
 #include "acados_c/ocp_nlp_interface.h"
@@ -88,6 +89,8 @@
 #define NSPHIN PLANNER_PAYLOAD_NSPHIN
 #define NSGN   PLANNER_PAYLOAD_NSGN
 #define NSBXN  PLANNER_PAYLOAD_NSBXN
+
+
 
 
 
@@ -423,7 +426,9 @@ void planner_payload_acados_create_set_default_parameters(planner_payload_solver
 {
 
     const int N = capsule->nlp_solver_plan->N;
-    // initialize parameters to nominal value
+
+    // initialize parameters to initial value
+    
     double* p = calloc(NP, sizeof(double));
     p[2] = 0.47;
     p[8] = -1;

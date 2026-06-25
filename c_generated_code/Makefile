@@ -86,8 +86,8 @@ OBJ+= $(OCP_OBJ)
 EXTERNAL_DIR=
 EXTERNAL_LIB=
 
-INCLUDE_PATH = //home/fer/acados/include
-LIB_PATH = //home/fer/acados/lib
+INCLUDE_PATH = /home/fer/acados/include
+LIB_PATH = /home/fer/acados/lib
 
 # preprocessor flags for make's implicit rules
 CPPFLAGS+= -I$(INCLUDE_PATH)
@@ -147,7 +147,7 @@ ocp_cython_c: ocp_shared_lib
 	-o acados_ocp_solver_pyx.c \
 	-I $(INCLUDE_PATH)/../interfaces/acados_template/acados_template \
 	$(INCLUDE_PATH)/../interfaces/acados_template/acados_template/acados_ocp_solver_pyx.pyx \
-	-I /home/fer/payload_transportation_ws/src/planner_payload_cpp/c_generated_code \
+	-I /home/fer/PHD_RESEARCH/payload_transportation_ws_kilted/src/planner_payload_cpp/c_generated_code \
 
 ocp_cython_o: ocp_cython_c
 	$(CC) $(ACADOS_FLAGS) -c -O2 \
@@ -157,8 +157,8 @@ ocp_cython_o: ocp_cython_c
 	-I $(INCLUDE_PATH)/blasfeo/include/ \
 	-I $(INCLUDE_PATH)/hpipm/include/ \
 	-I $(INCLUDE_PATH) \
-	-I /home/fer/.local/lib/python3.10/site-packages/numpy/core/include \
-	-I /usr/include/python3.10 \
+	-I /home/fer/.local/lib/python3.12/site-packages/numpy/_core/include \
+	-I /usr/include/python3.12 \
 	acados_ocp_solver_pyx.c \
 
 ocp_cython: ocp_cython_o
@@ -176,7 +176,7 @@ sim_cython_c: sim_shared_lib
 	-o acados_sim_solver_pyx.c \
 	-I $(INCLUDE_PATH)/../interfaces/acados_template/acados_template \
 	$(INCLUDE_PATH)/../interfaces/acados_template/acados_template/acados_sim_solver_pyx.pyx \
-	-I /home/fer/payload_transportation_ws/src/planner_payload_cpp/c_generated_code \
+	-I /home/fer/PHD_RESEARCH/payload_transportation_ws_kilted/src/planner_payload_cpp/c_generated_code \
 
 sim_cython_o: sim_cython_c
 	$(CC) $(ACADOS_FLAGS) -c -O2 \
@@ -186,8 +186,8 @@ sim_cython_o: sim_cython_c
 	-I $(INCLUDE_PATH)/blasfeo/include/ \
 	-I $(INCLUDE_PATH)/hpipm/include/ \
 	-I $(INCLUDE_PATH) \
-	-I /home/fer/.local/lib/python3.10/site-packages/numpy/core/include \
-	-I /usr/include/python3.10 \
+	-I /home/fer/.local/lib/python3.12/site-packages/numpy/_core/include \
+	-I /usr/include/python3.12 \
 	acados_sim_solver_pyx.c \
 
 sim_cython: sim_cython_o

@@ -30,6 +30,7 @@
 // standard
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h> // memcpy
 
 // acados
 #include "acados_c/external_function_interface.h"
@@ -44,7 +45,6 @@
 // example specific
 #include "planner_payload_jerk_model/planner_payload_jerk_model.h"
 #include "acados_sim_solver_planner_payload_jerk.h"
-
 
 // ** solver data **
 
@@ -191,11 +191,10 @@ int planner_payload_jerk_acados_sim_create(planner_payload_jerk_sim_solver_capsu
 
 
     /* initialize parameter values */
-    double* p = calloc(np, sizeof(double));
     
+    double* p = calloc(np, sizeof(double));
     p[2] = 0.47;
     p[8] = -1;
-
     planner_payload_jerk_acados_sim_update_params(capsule, p, np);
     free(p);
 
