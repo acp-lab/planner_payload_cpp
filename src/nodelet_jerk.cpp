@@ -21,7 +21,7 @@ public:
     this->declare_parameter("mass_payload", 0.2);
     this->declare_parameter("mass", 1.0);
     this->declare_parameter("gravity", 9.81);
-    this->declare_parameter("cable_length", 0.76);
+    this->declare_parameter("cable_length", 1.0);
     this->declare_parameter("cable_signal_filter_alpha", 0.2);
     this->declare_parameter<std::vector<double>>(
         "nmpc.Q_jerk", std::vector<double>{210., 210., 210., 1., 1., 1., 5., 5.,
@@ -537,7 +537,7 @@ private:
   double mass_payload_{0.2};
   double mass_quadrotor_{1.0};
   double gravity_{9.81};
-  double cable_length_{0.76};
+  double cable_length_{1.0};
   double cable_signal_filter_alpha_{0.2};
   std::vector<double> Q_param_;
   std::vector<double> Q_e_param_;

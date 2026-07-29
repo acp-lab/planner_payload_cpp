@@ -20,7 +20,7 @@ public:
 
     this->declare_parameter("mass_payload", 0.1128);
     this->declare_parameter("gravity", 9.81);
-    this->declare_parameter("cable_length", 0.88);
+    this->declare_parameter("cable_length", 1.0);
 
     logParameter("mass_payload", mass_payload_, "%.4f");
     logParameter("gravity", gravity_, "%.4f");

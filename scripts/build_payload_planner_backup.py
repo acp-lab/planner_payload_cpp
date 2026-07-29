@@ -49,7 +49,7 @@ class PayloadControlMujocoNode():
         self.c1 = c1
         
         # Cable length
-        self.length = 0.88
+        self.length = 1.0
         self.e3 = ca.DM([0, 0, 1])
 
         # Position of the system payload
@@ -294,4 +294,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
