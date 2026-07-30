@@ -43,8 +43,8 @@ class PayloadPlannerJerkBuilder:
         vel_0 = np.zeros((3,), dtype=np.double)
         wrench_0 = np.array([0.0, 0.0, self.mass * self.gravity], dtype=np.double)
         tension_0 = np.linalg.norm(wrench_0)
-        self.tension_min = 0.1*tension_0
-        self.tension_max = 10.0*tension_0
+        self.tension_min = 0.1 * tension_0
+        self.tension_max = 10.0 * tension_0
         n_init = -wrench_0 / tension_0
         r_init = np.zeros((3,), dtype=np.double)
         a_q_init = np.zeros((3,), dtype=np.double)
@@ -135,7 +135,9 @@ class PayloadPlannerJerkBuilder:
         r1_dot = -(1.0 / self.length) * ca.cross(n1, (a_q + gravity_vec))
         a_q_dot = j_q
 
-        f_expl = ca.vertcat(linear_velocity, linear_acceleration, n1_dot, r1_dot, a_q_dot)
+        f_expl = ca.vertcat(
+            linear_velocity, linear_acceleration, n1_dot, r1_dot, a_q_dot
+        )
 
         nx = x.shape[0]
         x_dot = ca.MX.sym("x_dot", nx, 1)
@@ -172,17 +174,17 @@ class PayloadPlannerJerkBuilder:
         x = ocp.model.x
         u = ocp.model.u
         p = ocp.model.p
-        
+
         # Split states of the system
         x_p = x[0:3]
         v_p = x[3:6]
         n1 = x[6:9]
         r1 = x[9:12]
         a_q = x[12:15]
-        
+
         # Control actions of the system
         j_q = u[0:3]
-        
+
         # Split desired states of the system
         x_p_d = p[0:3]
         v_p_d = p[3:6]
@@ -195,7 +197,7 @@ class PayloadPlannerJerkBuilder:
 
         error_position = x_p - x_p_d
         error_velocity = v_p - v_p_d
-        
+
         error_n1 = ca.cross(n1_d, n1)
 
         tangent_projector = ca.MX.eye(3) - n1 @ n1.T
@@ -207,8 +209,7 @@ class PayloadPlannerJerkBuilder:
 
         orthogonality_error = ca.dot(n1, r1)
         tension_expr = self.mass * (
-            self.length * ca.dot(r1, r1)
-            - ca.dot(n1, (a_q + self.gravity * self.e3))
+            self.length * ca.dot(r1, r1) - ca.dot(n1, (a_q + self.gravity * self.e3))
         )
 
         self.Q = ca.MX.zeros(3, 3)
@@ -216,10 +217,9 @@ class PayloadPlannerJerkBuilder:
         self.Q[1, 1] = 1.0
         self.Q[2, 2] = 20.0
 
-        lyapunov_position = (
-            100.0 * self.kp_min * (error_position.T @ self.Q @ error_position)
-            + 0.5 * self.kv_min * self.mass * (error_velocity.T @ error_velocity)
-        )
+        lyapunov_position = 100.0 * self.kp_min * (
+            error_position.T @ self.Q @ error_position
+        ) + 0.5 * self.kv_min * self.mass * (error_velocity.T @ error_velocity)
 
         ocp.model.cost_expr_ext_cost = (
             lyapunov_position
@@ -227,14 +227,14 @@ class PayloadPlannerJerkBuilder:
             + self.weight_r * (r_error.T @ r_error)
             + self.weight_accel * (a_q_error.T @ a_q_error)
             + self.weight_jerk * (j_q_error.T @ j_q_error)
-            + self.weight_orthogonality * (orthogonality_error ** 2)
+            + self.weight_orthogonality * (orthogonality_error**2)
         )
         ocp.model.cost_expr_ext_cost_e = (
             lyapunov_position
             + self.weight_cable_direction * (error_n1.T @ error_n1)
             + self.weight_r * (r_error.T @ r_error)
             + self.weight_accel * (a_q_error.T @ a_q_error)
-            + self.weight_orthogonality * (orthogonality_error ** 2)
+            + self.weight_orthogonality * (orthogonality_error**2)
         )
 
         ref_params = np.hstack((self.x_0, self.u_equilibrium))
