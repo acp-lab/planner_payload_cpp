@@ -227,6 +227,9 @@ class PayloadControlMujocoNode:
         # Optimal control problem
         ocp = AcadosOcp()
         ocp.model = model
+        ocp.name = model.name
+        ocp.code_gen_options.code_export_directory = "c_generated_code"
+        ocp.code_gen_options.json_file
 
         # Get size of the system
         nx = model.x.size()[0]

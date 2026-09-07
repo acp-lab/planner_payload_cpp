@@ -81,12 +81,8 @@ class PayloadPlannerJerkBuilder:
         self.json_file = self.project_root / "acados_ocp_planner_payload_jerk.json"
 
         self.ocp = self.solver(self.x_0)
-        AcadosOcpSolver(
-            self.ocp,
-            json_file=str(self.json_file),
-            build=True,
-            generate=True,
-        )
+
+        AcadosOcpSolver(self.ocp, build=True, generate=True)
 
     def payloadModel(self) -> AcadosModel:
         model_name = "planner_payload_jerk"
@@ -162,12 +158,13 @@ class PayloadPlannerJerkBuilder:
 
         ocp = AcadosOcp()
         ocp.model = model
-        ocp.code_gen_opts.code_export_directory = str(self.code_export_directory)
+        ocp.name = model.name
+        ocp.code_gen_options.code_export_directory = str(self.code_export_directory)
+        ocp.code_gen_options.json_file = self.json_file.name
 
         nx = model.x.size()[0]
         nu = model.u.size()[0]
 
-        ocp.dims.N = self.N_prediction
         ocp.cost.cost_type = "EXTERNAL"
         ocp.cost.cost_type_e = "EXTERNAL"
 
